@@ -16,17 +16,18 @@ ClipSort is a command-line tool, packaged as a Docker container, that helps stud
 
 ## 2. User Personas
 
-### Primary: Student Filmmaker (Jeremy's mentee)
+### Primary: Student Filmmaker (Jeremy)
 - Has shot raw footage for a 3-10 minute short film
 - Files are named with simple conventions (e.g., `1a.mp4`, `1b.mp4`, `1c.mp4`)
 - Wants clips organized into scene folders quickly
-- May not have technical expertise beyond running a single command
+- Currently taking AP Computer Science; building programming skills
 - Works on macOS or Windows with Docker Desktop installed
 
-### Secondary: Student Film Mentor (Jeremy)
-- Helps the student adopt better production workflows
+### Secondary: Mentor (Michael)
+- Mentors Jeremy on both filmmaking workflow and software engineering
 - Wants to introduce QR-coded clapper boards for future shoots
 - Values reproducibility and ease of deployment (hence Docker)
+- Using this project as a teaching tool for AP CS concepts
 
 ## 3. Assumptions and Constraints
 
