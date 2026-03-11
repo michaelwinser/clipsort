@@ -8,7 +8,31 @@ A structured curriculum for building ClipSort from scratch. Each lesson teaches 
 
 ---
 
+## Checkpoints: Pick Up Where You Need To
+
+Each module has a **checkpoint branch** — a snapshot of the working code at that module boundary. If you get stuck on a module or want to skip ahead, you can start fresh from any checkpoint:
+
+```bash
+git checkout checkpoint/module-N
+```
+
+| Checkpoint | What It Contains | Use It When... |
+|---|---|---|
+| `checkpoint/module-0` | Scaffolding only (pyproject.toml, Makefile, .gitignore, empty src/ and tests/ dirs, Dockerfile skeleton) | You finished Module 0 and want to start coding application logic |
+| `checkpoint/module-1` | Scaffolding + scanner + parser + ClipInfo with tests | You want to skip to building the organizer |
+| `checkpoint/module-2` | Full Phase 1 (scanner, parser, organizer, reporter, CLI, Docker) with all tests | You want to start QR code work |
+| `checkpoint/module-3` | Phase 1 + QR generator + QR detector + detection chain + video fixture infra | You want to start clapper board work |
+| `checkpoint/module-4` | Phase 1 + Phase 2 + Phase 3 (clapper detection, OCR, splitter) | You want to start engineering practices |
+
+**How checkpoints work:** Each branch contains the full, working code for everything up to that point. All tests pass on every checkpoint. You can compare your code against a checkpoint with `git diff checkpoint/module-N` to see what's different.
+
+**Important:** Checkpoints are a safety net, not a shortcut. You'll learn the most by writing the code yourself. But if you're stuck for more than 30 minutes on something mechanical (not conceptual), grab the checkpoint and move on to the interesting stuff.
+
+---
+
 ## Module 0: Project Setup and the Software Development Lifecycle
+
+> **Checkpoint:** Starting fresh? Run `git checkout checkpoint/module-0` for a working scaffold to build on.
 
 *Skills: version control, project scaffolding, dependency management, development environments, professional workflow*
 
@@ -526,6 +550,8 @@ This exercise practices the full cycle: requirement -> design -> plan.
 
 ## Module 1: Foundations — Files, Strings, and Patterns
 
+> **Checkpoint:** Need a fresh start? Run `git checkout checkpoint/module-1` for working scanner + parser code.
+
 *AP CS alignment: strings, conditionals, loops, methods, data types*
 
 ### Lesson 1.1: Working with Files and Paths
@@ -708,6 +734,8 @@ you add more fields later.
 
 ## Module 2: Building the Organizer
 
+> **Checkpoint:** Need a fresh start? Run `git checkout checkpoint/module-2` for the full Phase 1 codebase (scanner, parser, organizer, reporter, CLI, Docker).
+
 *AP CS alignment: lists, dictionaries, file I/O, algorithm design, testing*
 
 ### Lesson 2.1: Planning Before Executing
@@ -842,6 +870,120 @@ Write tests for:
 ```
 
 **Key concept — the test pyramid:** Unit tests (fast, test one function) form the base. Integration tests (test multiple components together) are in the middle. End-to-end tests (test the whole app) are at the top. Write many unit tests, fewer integration tests.
+
+---
+
+### Lesson 2.2.5: Building Test Fixtures
+
+**Concepts:** Test fixtures, conftest.py, generated vs. static test data, factory patterns
+
+**Background reading:** A test fixture is the "stuff" your tests need — test files, directories, sample data. The question is: do you commit test data to the repo, or generate it on the fly? The answer depends on what you're testing.
+
+**Exercises:**
+
+**Exercise 2.2.5a — conftest.py and shared fixtures**
+```
+pytest has a special file called conftest.py. Any fixture defined there
+is automatically available to all test files in the same directory.
+
+Create tests/conftest.py with a fixture that builds a temporary
+directory of test video files:
+
+  import pytest
+  from pathlib import Path
+
+  @pytest.fixture()
+  def sample_video_dir(tmp_path):
+      d = tmp_path / "videos"
+      d.mkdir()
+      for name in ["1a.mp4", "1b.mp4", "2a.mp4", "2b.mp4"]:
+          (d / name).touch()  # creates empty files
+      return d
+
+Use this fixture in a test:
+
+  def test_scanner_finds_videos(sample_video_dir):
+      scanner = FileScanner()
+      files = scanner.scan(sample_video_dir)
+      assert len(files) == 4
+
+Key ideas:
+  - tmp_path is a built-in pytest fixture that gives you a fresh temp dir
+  - Your fixture builds on tmp_path to create specific test scenarios
+  - Each test gets its own tmp_path, so tests can't interfere with each other
+  - Fixtures are functions, so you can parameterize them
+```
+
+**Exercise 2.2.5b — Generated vs. static fixtures**
+```
+For ClipSort, we need three kinds of test data:
+
+  1. EMPTY FILES (Phase 1): We only care about filenames, not content.
+     -> Generate in conftest.py using Path.touch()
+     -> Zero bytes, instant to create
+
+  2. TINY VIDEOS (Phase 2): We need real video data for QR detection.
+     -> Generate in conftest.py using OpenCV
+     -> 320x240, 5fps, 1 second = ~30KB per video
+     -> Created once per test session (scope="session")
+
+  3. CLAPPER BOARD PHOTOS (Phase 3): We need realistic images.
+     -> Commit static files to tests/fixtures/clapper_boards/
+     -> Realistic handwriting and lighting can't be generated
+
+The rule of thumb: generate what you can, commit what you can't.
+
+Why not commit everything? Binary files bloat the git repo, are hard
+to diff, and someone has to maintain them. Why not generate everything?
+Some test data (handwritten text, real-world photos) can't be
+programmatically reproduced with enough fidelity.
+
+Write fixtures for at least three test scenarios:
+  - A directory with files using the scene-letter pattern (1a, 1b...)
+  - A directory with mixed naming patterns
+  - A nested directory simulating multiple memory cards
+```
+
+**Exercise 2.2.5c — Video fixture factory (Phase 2 preview)**
+```
+When you reach Phase 2, you'll need test videos with QR codes baked in.
+Here's the pattern — a session-scoped factory fixture:
+
+  @pytest.fixture(scope="session")
+  def make_test_video(tmp_path_factory):
+      cv2 = pytest.importorskip("cv2")  # skip if OpenCV not installed
+      import numpy as np
+
+      video_dir = tmp_path_factory.mktemp("videos")
+
+      def _make(filename, *, qr_data=None):
+          path = video_dir / filename
+          writer = cv2.VideoWriter(
+              str(path),
+              cv2.VideoWriter_fourcc(*"mp4v"),
+              5, (320, 240)
+          )
+          for i in range(5):  # 1 second at 5fps
+              frame = np.zeros((240, 320, 3), dtype=np.uint8)
+              frame[:,:] = (i * 50, 128, 200)
+              writer.write(frame)
+          writer.release()
+          return path
+
+      return _make
+
+Key patterns:
+  - scope="session": created once, shared across all tests (fast)
+  - pytest.importorskip: gracefully skip if dependency not installed
+  - Factory function: each call creates a different test video
+  - tmp_path_factory: session-scoped version of tmp_path
+
+Don't worry about implementing this now — you'll build it in Module 3.
+The point is to understand the pattern: factories that generate minimal
+test data on demand.
+```
+
+**Key concept — good tests are self-contained:** Tests that depend on files committed to the repo are fragile — someone might delete or modify the file, and the test breaks for a non-obvious reason. Tests that generate their own data are self-documenting: the fixture *is* the specification of what the test needs.
 
 ---
 
@@ -994,6 +1136,8 @@ This is easier to remember and share than long docker run commands.
 ---
 
 ## Module 3: QR Code Detection
+
+> **Checkpoint:** Need a fresh start? Run `git checkout checkpoint/module-3` for Phase 1 + QR code support.
 
 *AP CS alignment: 2D arrays (images), algorithms, binary data, encoding/decoding*
 
@@ -1197,6 +1341,8 @@ video with neither.
 
 ## Module 4: Clapper Board Detection (Advanced)
 
+> **Checkpoint:** Need a fresh start? Run `git checkout checkpoint/module-4` for Phase 1 + Phase 2 + Phase 3 code.
+
 *AP CS alignment: algorithm design, image processing, working with external libraries*
 
 ### Lesson 4.1: Image Processing Basics
@@ -1386,6 +1532,8 @@ processing, detection algorithms, and subprocess management.
 ---
 
 ## Module 5: Engineering Practices in Action
+
+> **No checkpoint for Module 5.** This module is about applying practices to whatever code you've built — there's no specific code to skip to.
 
 *Skills: debugging, refactoring, dependency management, CI/CD, releases, documentation*
 

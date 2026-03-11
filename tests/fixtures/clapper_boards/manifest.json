@@ -1,0 +1,4 @@
+{
+  "_description": "Expected OCR results for clapper board reference images. Each entry maps a filename to its expected scene/take info and any notes about the image.",
+  "images": []
+}

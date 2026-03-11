@@ -1,0 +1,6 @@
+services:
+  clipsort:
+    build: .
+    volumes:
+      - ./test_videos:/input:ro
+      - ./output:/output
