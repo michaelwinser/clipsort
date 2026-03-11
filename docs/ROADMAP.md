@@ -75,6 +75,13 @@ Each phase produces a working Docker image that can be used independently. Later
 - Test that `docker run` works with mounted volumes
 - **Tests:** Docker build succeeds; smoke test with fixture files
 
+#### 1.8 Wrapper and build scripts
+- Create `clipsort` (bash) and `clipsort.bat` wrapper scripts that translate local paths to Docker volume mounts and pass all arguments through
+- Create `build` (bash) and `build.bat` scripts that build the Docker image
+- Wrapper script checks for the Docker image and prints a helpful message if it's missing
+- No dependency on `make` for end-user workflows
+- **Tests:** Wrapper invocation with `--dry-run` produces correct output; missing-image warning is shown
+
 ### Phase 1 Acceptance Criteria
 - [ ] `clipsort organize ./raw ./organized` correctly sorts files named `1a.mp4`, `1b.mp4`, `2a.mp4` into `scene_01/` and `scene_02/`
 - [ ] `--dry-run` shows the plan without moving files
@@ -83,11 +90,13 @@ Each phase produces a working Docker image that can be used independently. Later
 - [ ] Unrecognized filenames go to `unsorted/`
 - [ ] Summary report is printed after organization
 - [ ] Docker container runs and produces correct output
+- [ ] `./clipsort` wrapper works on macOS/Linux; `clipsort.bat` works on Windows
+- [ ] `./build` and `build.bat` build the Docker image without requiring `make`
 - [ ] All unit and integration tests pass
 - [ ] `ruff` reports no linting issues
 
 ### Use Cases Covered
-UC-1001, UC-1002, UC-1003, UC-1004, UC-1005, UC-1006, UC-4001, UC-4002, UC-4003
+UC-1001, UC-1002, UC-1003, UC-1004, UC-1005, UC-1006, UC-4001, UC-4002, UC-4003, UC-4004, UC-4005
 
 ---
 

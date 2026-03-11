@@ -343,6 +343,40 @@ docker run -v /path/to/videos:/input -v /path/to/output:/output clipsort organiz
 - Progress is shown for batches of more than 1 file
 - No excessive output; progress updates in place when possible
 
+#### UC-4004: Wrapper scripts for idiomatic CLI usage
+
+**Actor:** Student Filmmaker
+**Precondition:** Docker image has been built; user is on macOS, Linux, or Windows
+**Trigger:** User runs `./clipsort organize ./raw ./organized` (or `clipsort.bat` on Windows)
+**Flow:**
+1. Wrapper script checks that the Docker image exists
+2. Script translates local input and output paths to Docker volume mounts
+3. Script invokes `docker run` with the correct mounts and passes all arguments through
+4. Output and exit code are passed back to the user transparently
+
+**Postcondition:** User interacts with ClipSort as if it were a native CLI tool
+**Acceptance Criteria:**
+- `./clipsort organize ./raw ./organized` works identically to the full `docker run` command
+- All CLI flags (`--dry-run`, `--move`, `--recursive`, etc.) are passed through
+- If the Docker image does not exist, the script prints a clear message telling the user how to build it
+- Bash version works on macOS and Linux
+- `.bat` version works on Windows
+
+#### UC-4005: Cross-platform build script
+
+**Actor:** Student Filmmaker
+**Precondition:** Docker is installed; project is cloned
+**Trigger:** User runs `./build` (or `build.bat` on Windows)
+**Flow:**
+1. Script builds the Docker image from the Dockerfile
+2. Script reports success or failure
+
+**Postcondition:** Docker image is ready to use
+**Acceptance Criteria:**
+- `./build` builds the image on macOS and Linux
+- `build.bat` builds the image on Windows
+- No dependency on `make` or other build tools beyond Docker itself
+
 ---
 
 ### UC-5000: Configuration and Extensibility
