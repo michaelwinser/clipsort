@@ -7,23 +7,18 @@ Built as a learning project for student filmmakers and AP CS students. See [`doc
 ## Quick Start
 
 ```bash
-# With Docker
-docker build -t clipsort .
-docker run --rm \
-  -v /path/to/videos:/input:ro \
-  -v /path/to/output:/output \
-  clipsort organize /input /output
-
-# Without Docker
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-clipsort organize ./raw ./organized
+./build                                       # Build the Docker image
+./clipsort organize ./raw ./organized         # Organize your clips
 ```
+
+On Windows, use `build.bat` and `clipsort.bat` instead.
+
+The wrapper scripts handle Docker volume mounts automatically — you just use local paths.
 
 ## Usage
 
 ```
-clipsort organize [OPTIONS] INPUT_DIR OUTPUT_DIR
+./clipsort organize [OPTIONS] INPUT_DIR OUTPUT_DIR
 ```
 
 | Option | Description |
@@ -48,7 +43,7 @@ Files that don't match any pattern go to an `unsorted/` folder.
 ### Example
 
 ```
-$ clipsort organize ./raw ./organized --dry-run
+$ ./clipsort organize ./raw ./organized --dry-run
 
 Found 5 video file(s).
 
@@ -88,6 +83,10 @@ docker run --rm clipsort-dev ruff check src/ tests/
 ## Project Structure
 
 ```
+clipsort            # Wrapper script (macOS/Linux)
+clipsort.bat        # Wrapper script (Windows)
+build               # Build script (macOS/Linux)
+build.bat           # Build script (Windows)
 src/clipsort/
   scanner.py      # Find video files in directories
   parser.py       # Extract scene/take from filenames

@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+IMAGE_NAME="clipsort"
+
+# Check that the Docker image exists
+if ! docker image inspect "${IMAGE_NAME}" >/dev/null 2>&1; then
+    echo "Error: Docker image '${IMAGE_NAME}' not found." >&2
+    echo "Build it first by running: ./build" >&2
+    exit 1
+fi
+
+# Collect arguments, translating local paths to volume mounts
+DOCKER_ARGS=()
+ARGS=()
+i=1
+skip_next=false
+
+for arg in "$@"; do
+    if $skip_next; then
+        skip_next=false
+        ARGS+=("$arg")
+        continue
+    fi
+
+    # Flags that take a path argument we need to pass through as-is
+    # (--report-file is handled inside the container, relative to /output)
+    ARGS+=("$arg")
+done
+
+# Find the subcommand and its positional path arguments
+# Usage: clipsort organize [OPTIONS] INPUT_DIR OUTPUT_DIR
+# We need to identify INPUT_DIR and OUTPUT_DIR to mount them.
+subcommand=""
+input_dir=""
+output_dir=""
+passthrough=()
+positional_count=0
+
+for arg in "${ARGS[@]}"; do
+    if [[ -z "$subcommand" ]]; then
+        if [[ "$arg" != -* ]]; then
+            subcommand="$arg"
+        fi
+        passthrough+=("$arg")
+        continue
+    fi
+
+    # After the subcommand, collect positional args (non-flag arguments)
+    if [[ "$arg" == -* ]]; then
+        passthrough+=("$arg")
+        # If this flag takes a value, the next arg is its value
+        case "$arg" in
+            --report-file) skip_next=true ;;
+        esac
+    elif $skip_next 2>/dev/null; then
+        passthrough+=("$arg")
+        skip_next=false
+    else
+        positional_count=$((positional_count + 1))
+        if [[ $positional_count -eq 1 ]]; then
+            input_dir="$arg"
+        elif [[ $positional_count -eq 2 ]]; then
+            output_dir="$arg"
+        else
+            passthrough+=("$arg")
+        fi
+    fi
+done
+
+# If we identified input/output dirs, resolve them and mount as volumes
+if [[ -n "$input_dir" && -n "$output_dir" ]]; then
+    abs_input="$(cd "$input_dir" 2>/dev/null && pwd)" || {
+        echo "Error: Input directory '${input_dir}' does not exist." >&2
+        exit 1
+    }
+    abs_output="$(mkdir -p "$output_dir" && cd "$output_dir" && pwd)"
+
+    exec docker run --rm \
+        -v "${abs_input}:/input:ro" \
+        -v "${abs_output}:/output" \
+        "${IMAGE_NAME}" "${passthrough[@]}" /input /output
+else
+    # No path translation needed (e.g. --help, --version)
+    exec docker run --rm "${IMAGE_NAME}" "$@"
+fi

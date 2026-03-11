@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+IMAGE_NAME="clipsort"
+
+echo "Building ${IMAGE_NAME} Docker image..."
+docker build -t "${IMAGE_NAME}" .
+echo "Done. Run ./clipsort --help to get started."
