@@ -8,6 +8,522 @@ A structured curriculum for building ClipSort from scratch. Each lesson teaches 
 
 ---
 
+## Module 0: Project Setup and the Software Development Lifecycle
+
+*Skills: version control, project scaffolding, dependency management, development environments, professional workflow*
+
+This module is arguably the most important one. Knowing how to set up a project from scratch — and how professional developers manage code over time — is a skill you'll use on every project for the rest of your career. Most CS classes skip this entirely, but it's what separates "I can write a function" from "I can build and ship software."
+
+### Lesson 0.1: Version Control with Git
+
+**Concepts:** Repositories, commits, branches, diffs, history, collaboration
+
+**Background reading:** Git tracks every change you make to your code, creating a timeline you can navigate. If you break something, you can go back. If you want to try an experiment, you can create a branch. Every professional software project uses version control — it's not optional.
+
+Think of it like "undo" on steroids: not just one level of undo, but a complete history of every change, who made it, when, and why.
+
+**Exercises:**
+
+**Exercise 0.1a — Your first repository**
+```
+Create a new directory for ClipSort and initialize it as a git repo:
+
+  mkdir clipsort
+  cd clipsort
+  git init
+
+Now create a simple file — say, a one-line README.txt that says
+"ClipSort - video clip organizer". Then:
+
+  git status          # Shows untracked files
+  git add README.txt  # Stage the file (tell git you want to include it)
+  git commit -m "Initial commit: add README"
+
+Run `git log` to see your commit. You now have a permanent record of
+this change. Even if you delete the file later, git remembers it.
+
+Key commands to understand:
+  - git status: "What's changed since my last commit?"
+  - git add: "I want to include this change in my next commit"
+  - git commit: "Save a snapshot of all staged changes"
+  - git log: "Show me the history"
+  - git diff: "Show me what changed"
+```
+
+**Exercise 0.1b — Making and tracking changes**
+```
+Edit your README.txt — add a second line describing what ClipSort does.
+Now explore the workflow:
+
+  git status          # Shows README.txt is "modified"
+  git diff            # Shows exactly what changed (lines added/removed)
+  git add README.txt
+  git commit -m "Add project description to README"
+
+Now make a change you don't want to keep. Edit the file, then:
+  git diff            # See the unwanted change
+  git restore README.txt  # Undo the change, go back to last commit
+
+This is why git matters: you can experiment freely because you can
+always get back to a known good state.
+
+Practice: make 3-4 more commits, adding content each time. Run
+`git log --oneline` to see your history grow.
+```
+
+**Exercise 0.1c — .gitignore: what NOT to track**
+```
+Some files should never be committed to git:
+  - .env files (contain secrets like API keys)
+  - __pycache__/ (Python's compiled cache — regenerated automatically)
+  - .venv/ (your virtual environment — too large, machine-specific)
+  - .DS_Store (macOS junk files)
+
+Create a .gitignore file:
+
+  # Python
+  __pycache__/
+  *.py[cod]
+  *.egg-info/
+  dist/
+  build/
+  .venv/
+
+  # Environment
+  .env
+
+  # OS
+  .DS_Store
+
+  # IDE
+  .idea/
+  .vscode/
+
+Commit it: git add .gitignore && git commit -m "Add .gitignore"
+
+Test it: create a file called "test.pyc". Run `git status`. Notice
+git ignores it completely. Delete the test file.
+
+Why this matters: without .gitignore, you'd accidentally commit
+secrets, junk files, or huge directories. On a team, this causes
+real problems.
+```
+
+**Exercise 0.1d — Branching: safe experimentation**
+```
+Branches let you work on a feature without affecting the main code:
+
+  git branch                  # List branches (* marks current)
+  git checkout -b add-parser  # Create and switch to a new branch
+
+Now make some changes and commit them. These commits exist only on
+the "add-parser" branch. The "main" branch is untouched.
+
+  git log --oneline           # See commits on this branch
+  git checkout main           # Switch back to main
+  git log --oneline           # Those commits aren't here!
+  git checkout add-parser     # Switch back — they're still here
+
+When your feature is ready, you merge it:
+  git checkout main
+  git merge add-parser
+
+This workflow — branch, develop, merge — is how every team develops
+software. It prevents half-finished work from breaking the main code.
+```
+
+**Key concept — why version control matters:** Without git, you'd be saving copies like `parser_v2.py`, `parser_v2_fixed.py`, `parser_v2_final_FINAL.py`. Sound familiar? Git solves this properly. It's the single most important tool in a professional developer's toolkit.
+
+---
+
+### Lesson 0.2: GitHub — Collaboration and Code Hosting
+
+**Concepts:** Remote repositories, pushing, pulling, pull requests, code review, issues
+
+**Background reading:** Git works locally on your machine. GitHub is a website that hosts your repository online, enabling collaboration, backup, and project management. Even on a solo project, GitHub gives you issue tracking, a backup of your code, and a portfolio to show others.
+
+**Exercises:**
+
+**Exercise 0.2a — Create a GitHub repository**
+```
+1. Go to github.com and create a new repository called "clipsort"
+2. Follow GitHub's instructions to connect your local repo:
+
+  git remote add origin https://github.com/YOUR_USERNAME/clipsort.git
+  git push -u origin main
+
+Now your code is backed up online. If your laptop dies, your code
+survives. Run `git log --oneline` on GitHub's web interface to verify.
+
+Vocabulary:
+  - "remote": a copy of your repo hosted somewhere else (GitHub)
+  - "origin": the default name for your remote
+  - "push": upload your commits to the remote
+  - "pull": download new commits from the remote
+```
+
+**Exercise 0.2b — Issues: tracking what needs to be done**
+```
+GitHub Issues are how teams track bugs, features, and tasks. Create
+your first issues using the GitHub web interface or the CLI:
+
+  gh issue create --title "Implement filename parser" \
+    --body "Parse filenames like 1a.mp4, Scene1_Take2.mp4 to extract scene/take info"
+
+  gh issue create --title "Implement file scanner" \
+    --body "Find all video files in a directory, with optional recursive scanning"
+
+  gh issue create --title "Implement organizer" \
+    --body "Copy/move files into scene folders based on parsed info"
+
+Create issues for the first 5-6 things you need to build.
+Each issue should describe WHAT needs to be done, not HOW.
+
+Look at your issue list: `gh issue list`
+This is your to-do list for the project.
+```
+
+**Exercise 0.2c — Pull requests: proposing changes**
+```
+A pull request (PR) says "I've made changes on a branch — please
+review them before merging into main." Even on a solo project, PRs
+create a record of what changed and why.
+
+  git checkout -b feature/file-scanner
+  # ... write code, make commits ...
+  git push -u origin feature/file-scanner
+
+  gh pr create --title "Add file scanner" \
+    --body "Implements FileScanner class. Closes #2."
+
+Notice "Closes #2" — this links the PR to the issue you created.
+When the PR is merged, the issue is automatically closed.
+
+Open the PR on GitHub's website. You can see:
+  - The diff (what changed)
+  - A place for review comments
+  - Status checks (tests passing/failing)
+
+Merge the PR: `gh pr merge --merge`
+
+This workflow — issue -> branch -> PR -> merge — is how professional
+teams work. It creates an audit trail of every decision.
+```
+
+**Key concept — the development loop:** Professional development follows a cycle: **Plan** (create an issue) -> **Branch** (isolate your work) -> **Build** (write code and tests) -> **Review** (pull request) -> **Merge** (integrate). Even solo developers benefit from this discipline.
+
+---
+
+### Lesson 0.3: Project Scaffolding
+
+**Concepts:** Directory structure conventions, configuration files, the "blank project" problem
+
+**Background reading:** Starting a new project is one of the hardest moments. You stare at an empty folder and think "where do I even begin?" Scaffolding is the answer: a standard set of files and directories that every Python project needs. Once you know the pattern, you can start any project in 10 minutes.
+
+**Exercises:**
+
+**Exercise 0.3a — Create the project structure**
+```
+Every well-structured Python project looks roughly like this:
+
+  clipsort/
+    src/
+      clipsort/
+        __init__.py
+        cli.py
+    tests/
+      __init__.py
+      conftest.py
+    pyproject.toml
+    Makefile
+    Dockerfile
+    .gitignore
+    README.txt
+
+Create this structure now. Most files can be empty placeholders —
+you'll fill them in during later modules. The point is that the
+structure exists from day one.
+
+Why this structure?
+  - src/clipsort/: your application code (a Python package)
+  - tests/: your test code (kept separate from application code)
+  - pyproject.toml: project metadata and dependencies
+  - Makefile: shortcuts for common commands
+  - Dockerfile: container packaging
+  - .gitignore: files git should ignore
+
+This is a convention, not a requirement. But following conventions
+means any Python developer can look at your project and instantly
+understand where things are.
+
+Commit this: git add -A && git commit -m "Add project scaffolding"
+```
+
+**Exercise 0.3b — pyproject.toml: your project's identity card**
+```
+pyproject.toml is the modern way to configure a Python project. It
+replaces the older setup.py, setup.cfg, and requirements.txt.
+
+Create pyproject.toml:
+
+  [project]
+  name = "clipsort"
+  version = "0.1.0"
+  description = "Organize video clips into scene folders"
+  requires-python = ">=3.12"
+  dependencies = [
+      "click>=8.0",
+  ]
+
+  [project.scripts]
+  clipsort = "clipsort.cli:main"
+
+  [project.optional-dependencies]
+  dev = [
+      "pytest>=7.0",
+      "pytest-cov",
+      "ruff",
+  ]
+
+  [tool.ruff]
+  target-version = "py312"
+  line-length = 100
+
+  [tool.pytest.ini_options]
+  testpaths = ["tests"]
+
+Sections explained:
+  - [project]: name, version, what Python version you need
+  - dependencies: packages your code needs to run
+  - [project.scripts]: "when someone types 'clipsort', run this function"
+  - [project.optional-dependencies]: packages only needed for development
+  - [tool.ruff]: linter configuration
+  - [tool.pytest]: test runner configuration
+
+Commit this change.
+```
+
+**Exercise 0.3c — Virtual environments: isolating your project**
+```
+A virtual environment is an isolated Python installation just for your
+project. Without it, installing a package for one project might break
+another project. Think of it as Docker for Python packages, but lighter.
+
+  python -m venv .venv            # Create the virtual environment
+  source .venv/bin/activate       # Activate it (macOS/Linux)
+  # On Windows: .venv\Scripts\activate
+
+Your terminal prompt changes to show (.venv). Now:
+  pip install -e ".[dev]"         # Install your project + dev dependencies
+
+The -e flag means "editable" — when you change your code, you don't
+need to reinstall. The ".[dev]" means "install this project plus the
+dev optional dependencies (pytest, ruff)."
+
+Verify: run `clipsort --help`. It should show your CLI (once you've
+written cli.py in Module 2).
+
+Important: the .venv/ directory is in your .gitignore. Every developer
+creates their own. The pyproject.toml is what you share — it's the
+recipe, not the cooked meal.
+```
+
+**Key concept — reproducibility:** Between pyproject.toml (which packages), .gitignore (what not to track), and virtual environments (isolated installation), you have everything needed for anyone to clone your repo and get a working development environment in two commands: `python -m venv .venv && pip install -e ".[dev]"`. This is a superpower.
+
+---
+
+### Lesson 0.4: Code Quality Tools
+
+**Concepts:** Linters, formatters, automation, Makefiles
+
+**Background reading:** Professional developers don't manually check for style issues, unused imports, or common mistakes. They use automated tools that catch these instantly. This isn't about being picky — it's about catching bugs before they become bugs.
+
+**Exercises:**
+
+**Exercise 0.4a — Linting with ruff**
+```
+ruff is a Python linter — it reads your code and warns about problems.
+It catches things like:
+  - Unused imports
+  - Undefined variables
+  - Style violations
+  - Common mistakes
+
+Write a deliberately bad Python file, bad_example.py:
+
+  import os
+  import sys
+  import json
+
+  def add(x,y):
+      result = x+y
+      unused_variable = 42
+      return result
+
+  def dead_code():
+      pass
+
+Run: ruff check bad_example.py
+
+ruff will flag: unused imports (os, sys, json), unused variable,
+unused function. Fix the issues and run ruff again until it's clean.
+
+Now configure ruff to run on your whole project:
+  ruff check src/ tests/
+```
+
+**Exercise 0.4b — The Makefile: one command to rule them all**
+```
+A Makefile defines shortcuts for commands you run frequently.
+Instead of remembering long commands, you type `make test`.
+
+Create a Makefile:
+
+  .PHONY: test lint format build clean help
+
+  help:             ## Show this help message
+  	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | sort | \
+  	  awk 'BEGIN {FS = ":.*?## "}; {printf "  %-15s %s\n", $$1, $$2}'
+
+  test:             ## Run tests
+  	pytest tests/ -v
+
+  test-cov:         ## Run tests with coverage report
+  	pytest tests/ -v --cov=clipsort --cov-report=term-missing
+
+  lint:             ## Check code quality
+  	ruff check src/ tests/
+
+  format:           ## Auto-format code
+  	ruff format src/ tests/
+
+  build:            ## Build Docker image
+  	docker build -t clipsort .
+
+  clean:            ## Remove build artifacts
+  	rm -rf build/ dist/ *.egg-info .pytest_cache .coverage
+  	find . -type d -name __pycache__ -exec rm -rf {} +
+
+Now:
+  make help    # See all available commands
+  make lint    # Run the linter
+  make test    # Run the tests
+
+Why not just type the commands directly? Three reasons:
+  1. You don't have to remember them
+  2. New developers can run `make help` to see what's available
+  3. CI/CD pipelines can use the same commands
+
+Commit the Makefile.
+```
+
+**Exercise 0.4c — Pre-commit: automated quality gates**
+```
+What if you could automatically run linting before every commit,
+so bad code never makes it into your git history?
+
+  pip install pre-commit
+
+Create .pre-commit-config.yaml:
+
+  repos:
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      rev: v0.9.0
+      hooks:
+        - id: ruff
+          args: [--fix]
+        - id: ruff-format
+
+  pip install pre-commit
+  pre-commit install
+
+Now try committing code with a lint error. pre-commit will block the
+commit and show you what's wrong. Fix it, stage again, commit again.
+
+This is a "quality gate" — an automated check that prevents mistakes
+from reaching your codebase. Professional teams use these extensively.
+```
+
+**Key concept — automation over discipline:** Don't rely on remembering to run the linter. Automate it. Don't rely on remembering the right flags for pytest. Put them in the Makefile. The best engineering practices are the ones that happen automatically.
+
+---
+
+### Lesson 0.5: The Software Development Lifecycle (SDLC)
+
+**Concepts:** Planning, requirements, design, implementation, testing, deployment, maintenance
+
+**Background reading:** Building software isn't just writing code. Professional software goes through a lifecycle of phases. Understanding this lifecycle helps you work methodically instead of hacking things together and hoping they work.
+
+**Exercises:**
+
+**Exercise 0.5a — Reading the planning documents**
+```
+Read through the three planning documents in the docs/ directory:
+
+  1. PRD.md (Product Requirements Document)
+     - What problem are we solving?
+     - Who is the user?
+     - What are the use cases?
+
+  2. DESIGN.md (Design Document)
+     - What components do we need?
+     - How do they connect?
+     - What technologies will we use?
+
+  3. ROADMAP.md (Implementation Roadmap)
+     - What do we build first?
+     - What can we defer?
+     - How do we know each phase is done?
+
+For each document, write down answers to:
+  - What's the purpose of this document?
+  - Who is the audience?
+  - When in the project lifecycle is it created?
+  - What would go wrong if we skipped it?
+```
+
+**Exercise 0.5b — Tracing a feature through the lifecycle**
+```
+Pick UC-1001 (organize clips by scene number from filename) and
+trace it through every phase of the lifecycle:
+
+  1. REQUIREMENT:  What does the PRD say this feature should do?
+  2. DESIGN:       What components in DESIGN.md handle it?
+  3. PLAN:         What roadmap tasks implement it?
+  4. IMPLEMENT:    What code files will you create/modify?
+  5. TEST:         What tests verify it works?
+  6. DEPLOY:       How does the user access it? (Docker container)
+
+Do the same for UC-2001 (QR code detection). Notice how a more complex
+feature touches more components and requires more planning.
+
+This is called "traceability" — the ability to trace any feature from
+its requirement all the way through to its tests. If a test fails,
+you can trace back to understand what requirement it validates.
+```
+
+**Exercise 0.5c — Writing your own use case**
+```
+Think of a feature that isn't in the PRD. Maybe:
+  - Renaming files based on scene/take (not just moving them)
+  - Generating a shot list from organized clips
+  - Creating a video montage of first frames from each scene
+
+Write a use case for it using the same format as the PRD:
+  - Give it a UC number (e.g., UC-6001)
+  - Define the Actor, Precondition, Trigger, Flow, Postcondition
+  - Write 3-4 Acceptance Criteria
+
+Then sketch which components from DESIGN.md would need to change,
+and where in the ROADMAP.md it would fit.
+
+This exercise practices the full cycle: requirement -> design -> plan.
+```
+
+**Key concept — the SDLC isn't waterfall:** You don't finish all planning before writing any code. In practice, you plan a phase, build it, learn from it, and adjust the plan for the next phase. The roadmap has 4 phases precisely because we don't try to design everything upfront. But having *some* plan before coding prevents wasted effort and missed requirements.
+
+---
+
 ## Module 1: Foundations — Files, Strings, and Patterns
 
 *AP CS alignment: strings, conditionals, loops, methods, data types*
@@ -869,125 +1385,430 @@ processing, detection algorithms, and subprocess management.
 
 ---
 
-## Module 5: Software Engineering Practices
+## Module 5: Engineering Practices in Action
 
-*AP CS alignment: program design, documentation, testing, code organization*
+*Skills: debugging, refactoring, dependency management, CI/CD, releases, documentation*
 
-### Lesson 5.1: Project Structure and Packaging
+Module 0 covered project setup. This module covers what happens *during* and *after* development — the ongoing engineering practices that keep a project healthy as it grows.
 
-**Concepts:** Modules, packages, `pyproject.toml`, entry points
+### Lesson 5.1: Debugging Systematically
 
-**Exercises:**
+**Concepts:** Reading error messages, stack traces, print debugging vs. debuggers, logging
 
-**Exercise 5.1a — Python packages**
-```
-Reorganize your code into a proper package:
-
-  src/
-    clipsort/
-      __init__.py      (can be empty)
-      cli.py           (Click commands)
-      scanner.py       (FileScanner)
-      parser.py        (FilenameParser, ClipInfo)
-      organizer.py     (Organizer, OrganizePlan)
-      reporter.py      (Reporter)
-
-In each module, import only what you need from others:
-  from clipsort.parser import ClipInfo, parse_filename
-
-Why organize this way? Each file has a single responsibility.
-When you fix a bug in the parser, you know exactly where to look.
-```
-
-**Exercise 5.1b — pyproject.toml**
-```
-Create pyproject.toml — the modern way to define a Python project:
-
-  [project]
-  name = "clipsort"
-  version = "0.1.0"
-  requires-python = ">=3.12"
-  dependencies = [
-      "click>=8.0",
-  ]
-
-  [project.scripts]
-  clipsort = "clipsort.cli:main"
-
-Install in development mode: pip install -e .
-Now you can run `clipsort` from anywhere.
-```
-
-### Lesson 5.2: Writing Good Tests
-
-**Concepts:** Test coverage, fixtures, mocking, CI/CD
+**Background reading:** Everyone's code has bugs. What separates experienced developers from beginners isn't writing bug-free code — it's finding and fixing bugs quickly. The key is being systematic instead of randomly changing things and hoping it works.
 
 **Exercises:**
 
-**Exercise 5.2a — Fixtures with conftest.py**
+**Exercise 5.1a — Reading a stack trace**
 ```
-Create tests/conftest.py with shared test fixtures:
+Python stack traces read bottom-to-top. The last line is the error,
+and the lines above show how you got there. Consider:
 
-  import pytest
-  from pathlib import Path
+  Traceback (most recent call last):
+    File "cli.py", line 42, in organize
+      plan = organizer.build_plan(files, output_dir)
+    File "organizer.py", line 18, in build_plan
+      info = parser.parse(f.name)
+    File "parser.py", line 31, in parse
+      scene = int(match.group(1))
+  ValueError: invalid literal for int() with base 10: 'abc'
 
-  @pytest.fixture
-  def sample_video_dir(tmp_path):
-      """Create a directory with sample video files."""
-      for name in ["1a.mp4", "1b.mp4", "2a.mp4", "2b.mp4", "notes.txt"]:
-          (tmp_path / name).touch()
-      return tmp_path
+Reading this: cli.py called organizer.py which called parser.py, and
+on line 31, it tried to convert 'abc' to an integer and failed.
 
-  @pytest.fixture
-  def scene_letter_files(tmp_path):
-      """Create files using scene+letter naming."""
-      files = ["1a.mp4", "1b.mp4", "1c.mp4", "2a.mp4", "2b.mp4", "3a.mp4"]
-      for name in files:
-          (tmp_path / name).touch()
-      return tmp_path, files
-
-Now any test can use these fixtures by name:
-  def test_scanner_finds_videos(sample_video_dir):
-      scanner = FileScanner()
-      videos = scanner.scan(sample_video_dir)
-      assert len(videos) == 4  # excludes notes.txt
+Practice: Deliberately introduce 3 different bugs into your parser
+code (e.g., wrong index, missing None check, bad regex). Run the
+tests. For each failure, read the stack trace and identify:
+  1. What error occurred? (the last line)
+  2. Where did it happen? (file and line number)
+  3. Why did it happen? (trace the data flow)
 ```
 
-**Exercise 5.2b — Test coverage**
+**Exercise 5.1b — Logging instead of print()**
 ```
-Install: pip install pytest-cov
+Using print() for debugging works but has problems: you have to
+remember to remove them, and they all look the same. Python's
+logging module is the professional alternative.
 
-Run: pytest --cov=clipsort --cov-report=term-missing
+  import logging
 
-This shows which lines of your code are NOT covered by any test.
-Aim for >90% coverage on parser.py and organizer.py.
+  logger = logging.getLogger(__name__)
 
-Look at the uncovered lines. Are they error handlers? Edge cases?
-Write tests that exercise them.
+  def parse(self, filename: str) -> ClipInfo | None:
+      logger.debug(f"Parsing filename: {filename}")
+      for name, pattern in self.PATTERNS:
+          match = pattern.match(filename)
+          if match:
+              logger.info(f"Matched pattern '{name}' for {filename}")
+              return ClipInfo(...)
+      logger.warning(f"No pattern matched: {filename}")
+      return None
+
+Add logging to your scanner and parser. Then control the output:
+  - Normal run: only warnings and errors show
+  - With --verbose: debug messages show too
+
+Wire --verbose to logging.basicConfig(level=logging.DEBUG).
+Now you have permanent, controllable instrumentation in your code.
 ```
 
-**Exercise 5.2c — Makefile for automation**
+**Exercise 5.1c — Writing a bug report**
 ```
-Create a Makefile that automates common tasks:
+When you find a bug, practice writing a proper GitHub issue:
 
-  .PHONY: test lint build run
+  Title: "Parser crashes on filenames with spaces"
 
-  test:
-  	pytest tests/ -v
+  ## Steps to reproduce
+  1. Create a file named "Scene 1 Take 2.mp4"
+  2. Run: clipsort organize ./input ./output
+  3. Observe crash
 
-  lint:
-  	ruff check src/ tests/
+  ## Expected behavior
+  File should be organized into scene_01/
 
-  build:
-  	docker build -t clipsort .
+  ## Actual behavior
+  ValueError: invalid literal for int()...
 
-  run:
-  	docker run --rm -v $(PWD)/test_videos:/input:ro \
-  	  -v $(PWD)/output:/output clipsort organize /input /output
+  ## Environment
+  - Python 3.12.1
+  - ClipSort v0.1.0
+  - macOS 15.3
 
-Now `make test` runs all tests. `make build` builds the Docker image.
-This is how real projects work — one command to do common things.
+Create a bug report issue on GitHub for a real or hypothetical bug.
+Then create a branch, fix it, write a test that covers it, and
+submit a PR that references the issue.
+
+This is the professional bug-fix workflow:
+  Bug report -> Branch -> Fix + Test -> PR -> Merge
 ```
+
+**Key concept — bugs are normal:** Professional developers spend as much time debugging as writing new code. The skill isn't avoiding all bugs — it's having a systematic process for finding and fixing them.
+
+---
+
+### Lesson 5.2: Refactoring — Improving Code Without Changing Behavior
+
+**Concepts:** Code smells, refactoring patterns, tests as a safety net
+
+**Background reading:** Refactoring means changing how code is structured without changing what it does. You do it to make code easier to read, maintain, or extend. Tests are your safety net — if they still pass after refactoring, you haven't broken anything.
+
+**Exercises:**
+
+**Exercise 5.2a — Identify code smells**
+```
+"Code smells" are patterns that suggest code could be improved.
+Look through your ClipSort code for these common smells:
+
+  1. LONG FUNCTION: any function longer than ~20 lines
+     Fix: break it into smaller functions with clear names
+
+  2. REPEATED CODE: similar logic in multiple places
+     Fix: extract a shared helper function
+
+  3. MAGIC VALUES: unexplained numbers or strings in code
+     Fix: use named constants
+     Bad:  if len(approx) == 4:
+     Good: RECTANGLE_VERTICES = 4
+           if len(approx) == RECTANGLE_VERTICES:
+
+  4. DEEP NESTING: 3+ levels of indentation
+     Fix: return early to flatten the structure
+     Bad:  if x:
+               if y:
+                   if z:
+                       do_thing()
+     Good: if not x: return
+           if not y: return
+           if not z: return
+           do_thing()
+
+Find at least 3 code smells in your code. For each one, write down
+what the smell is and how you'd fix it — but don't fix them yet.
+```
+
+**Exercise 5.2b — Refactor with tests as your safety net**
+```
+Now fix the code smells you identified. After EACH change:
+
+  1. Run `make test` to verify nothing broke
+  2. Commit the change with a message like:
+     "Refactor: extract _try_pattern() helper from parse()"
+
+If a test fails, you know exactly which change broke it (because
+you committed after each one). This is why small, frequent commits
+matter.
+
+Rules of refactoring:
+  - Change structure, not behavior
+  - One change at a time
+  - Test after every change
+  - If tests fail, undo and try a smaller change
+```
+
+**Exercise 5.2c — Adding a feature after refactoring**
+```
+After refactoring, adding a new feature should be easier. Try this:
+
+Add support for a new filename pattern — say, "Day1_Scene2_Take3.mp4".
+
+Notice how your refactored code (with clean pattern lists and helper
+functions) makes this a 2-3 line change instead of a major surgery.
+That's the payoff of refactoring.
+
+Write a test FIRST (test-driven development):
+  def test_day_scene_take_pattern():
+      result = parse_filename("Day1_Scene2_Take3.mp4")
+      assert result.scene == 2
+      assert result.take == 3
+
+Run it — it fails. Now add the pattern. Run it — it passes.
+Commit. This is the TDD cycle: Red (fail) -> Green (pass) -> Refactor.
+```
+
+**Key concept — refactoring is not rewriting:** Refactoring is small, safe, incremental improvements. Rewriting is starting over. Refactoring is almost always better. You keep working code working while making it better.
+
+---
+
+### Lesson 5.3: Managing Dependencies
+
+**Concepts:** Dependency versions, lock files, supply chain, updating
+
+**Background reading:** Your project depends on other people's code (Click, OpenCV, pytest). Managing these dependencies well prevents the dreaded "it worked yesterday but today it's broken" problem.
+
+**Exercises:**
+
+**Exercise 5.3a — Understanding version specifiers**
+```
+In pyproject.toml, dependencies have version constraints:
+
+  "click>=8.0"         # 8.0 or higher (any 8.x, 9.x, etc.)
+  "click>=8.0,<9.0"   # 8.0 or higher, but not 9.0+
+  "click~=8.1"        # >=8.1, <9.0 (compatible release)
+  "click==8.1.7"      # Exactly this version
+
+Why not always pin exact versions? Because then you can't get bug
+fixes or security patches. Why not leave them completely open?
+Because a breaking change in a dependency could break your tool.
+
+The sweet spot: use >= with a minimum version you've tested against.
+For production/Docker, generate a lock file (next exercise) for
+exact reproducibility.
+
+Review your pyproject.toml. For each dependency, decide: what's the
+minimum version you need, and should you cap the maximum?
+```
+
+**Exercise 5.3b — Lock files with pip-compile**
+```
+A lock file records the exact versions installed, including all
+sub-dependencies. This means "pip install" gives identical results
+on any machine at any time.
+
+  pip install pip-tools
+
+  # Generate a lock file from your pyproject.toml:
+  pip-compile pyproject.toml -o requirements.lock
+
+Look at requirements.lock — it lists every package with exact versions
+and hashes. Your Dockerfile should use this:
+
+  COPY requirements.lock .
+  RUN pip install --no-cache-dir -r requirements.lock
+
+Now your Docker image installs the exact same versions every time,
+even if new versions are released later.
+
+When you want to update dependencies:
+  pip-compile --upgrade pyproject.toml -o requirements.lock
+```
+
+**Exercise 5.3c — Adding a new dependency**
+```
+Practice the full workflow of adding a dependency:
+
+1. Identify the need: "I need to generate PDF files"
+2. Research options: fpdf2, reportlab, weasyprint
+3. Evaluate: size, maintenance status, license, ease of use
+4. Add to pyproject.toml: "fpdf2>=2.7"
+5. Regenerate the lock file: pip-compile ...
+6. Install: pip install -e ".[dev]"
+7. Write a minimal test to verify it works
+8. Commit all changes (pyproject.toml + lock file)
+
+Go through this process for one of ClipSort's Phase 2 dependencies
+(qrcode, pyzbar, or opencv-python-headless).
+```
+
+**Key concept — you are responsible for your dependencies:** Every dependency is code you didn't write but ship to your users. Check that dependencies are actively maintained, have compatible licenses, and don't introduce excessive risk. Run `pip audit` periodically to check for known vulnerabilities.
+
+---
+
+### Lesson 5.4: Continuous Integration (CI/CD)
+
+**Concepts:** Automated testing, GitHub Actions, build pipelines, deployment
+
+**Background reading:** CI (Continuous Integration) means automatically running your tests every time you push code. If tests fail, you know immediately — not days later when someone else tries to use your code. CD (Continuous Delivery) extends this to automatically building and publishing releases.
+
+**Exercises:**
+
+**Exercise 5.4a — Your first GitHub Action**
+```
+Create .github/workflows/ci.yml:
+
+  name: CI
+
+  on:
+    push:
+      branches: [main]
+    pull_request:
+      branches: [main]
+
+  jobs:
+    test:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+
+        - uses: actions/setup-python@v5
+          with:
+            python-version: "3.12"
+
+        - name: Install dependencies
+          run: pip install -e ".[dev]"
+
+        - name: Lint
+          run: ruff check src/ tests/
+
+        - name: Test
+          run: pytest tests/ -v
+
+Push this file. Go to your GitHub repo's "Actions" tab and watch it
+run. You now have automated CI.
+
+If you push code with a lint error or failing test, the Action fails
+and shows a red X. Pull requests will show this status too.
+```
+
+**Exercise 5.4b — Add Docker build to CI**
+```
+Extend your CI workflow to also build the Docker image:
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t clipsort .
+      - name: Smoke test
+        run: |
+          mkdir -p /tmp/test_input /tmp/test_output
+          touch /tmp/test_input/1a.mp4
+          docker run --rm \
+            -v /tmp/test_input:/input:ro \
+            -v /tmp/test_output:/output \
+            clipsort organize /input /output
+
+Now every push verifies that the Docker image builds and runs
+correctly. You'll never accidentally break the Docker build.
+```
+
+**Exercise 5.4c — Status badges and branch protection**
+```
+Add a CI status badge to your README so anyone can see if tests pass:
+
+  Go to your GitHub Actions workflow -> click "..." -> "Create status badge"
+  Copy the markdown and paste it at the top of your README.
+
+Set up branch protection rules (on GitHub):
+  1. Go to Settings -> Branches -> Add rule for "main"
+  2. Enable "Require status checks to pass before merging"
+  3. Select your CI workflow
+
+Now you literally cannot merge a PR that has failing tests. This
+protects your main branch from broken code.
+```
+
+**Key concept — CI is your automated teammate:** CI catches mistakes within minutes, runs the same checks every time (no forgetting), and gives everyone confidence that main is always working. Setting it up takes 30 minutes; it saves hours over the life of a project.
+
+---
+
+### Lesson 5.5: Releases and Versioning
+
+**Concepts:** Semantic versioning, changelogs, GitHub releases, tagging
+
+**Background reading:** At some point, your tool is ready for others to use. A "release" is a specific, tested, packaged version that you declare as ready. Versioning tells users what changed and whether an update might break their workflow.
+
+**Exercises:**
+
+**Exercise 5.5a — Semantic versioning**
+```
+Version numbers follow a pattern: MAJOR.MINOR.PATCH (e.g., 1.2.3)
+
+  PATCH (1.2.3 -> 1.2.4): Bug fixes, no new features
+  MINOR (1.2.3 -> 1.3.0): New features, backwards compatible
+  MAJOR (1.2.3 -> 2.0.0): Breaking changes
+
+For ClipSort, consider these changes. What version bump does each need?
+
+  - Fix: parser crashes on filenames with spaces     -> ?
+  - Add: new --json flag for machine-readable output  -> ?
+  - Change: rename --recursive flag to --deep          -> ?
+  - Add: QR code detection support (Phase 2)           -> ?
+  - Change: require Python 3.13 instead of 3.12        -> ?
+
+The answer depends on whether users have to change their behavior.
+If they don't, it's minor or patch. If they do, it's major.
+```
+
+**Exercise 5.5b — Creating a release**
+```
+When Phase 1 is complete, create a release:
+
+  1. Update the version in pyproject.toml to "0.1.0"
+  2. Create a CHANGELOG.md entry:
+
+     ## [0.1.0] - 2026-XX-XX
+
+     ### Added
+     - Filename-based clip organization (scene+letter, Scene_Take, S01T03)
+     - Dry-run mode (--dry-run)
+     - Move mode (--move) and copy (default)
+     - Recursive directory scanning (--recursive)
+     - Organization report with scene/clip counts
+     - Docker container support
+
+  3. Commit: git commit -m "Release v0.1.0"
+  4. Tag: git tag v0.1.0
+  5. Push: git push && git push --tags
+  6. Create a GitHub release:
+     gh release create v0.1.0 --title "v0.1.0: Filename Organizer" \
+       --notes-file CHANGELOG.md
+
+Now anyone can download a specific version of your tool.
+```
+
+**Exercise 5.5c — Publishing a Docker image**
+```
+Push your Docker image to GitHub Container Registry so anyone can
+pull it without building from source:
+
+  # Log in to GitHub's container registry
+  echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin
+
+  # Tag and push
+  docker tag clipsort ghcr.io/YOUR_USERNAME/clipsort:0.1.0
+  docker tag clipsort ghcr.io/YOUR_USERNAME/clipsort:latest
+  docker push ghcr.io/YOUR_USERNAME/clipsort:0.1.0
+  docker push ghcr.io/YOUR_USERNAME/clipsort:latest
+
+Now anyone can run your tool with:
+  docker run ghcr.io/YOUR_USERNAME/clipsort:0.1.0 organize /input /output
+
+Bonus: add this to your CI workflow to automatically publish on
+every tagged release.
+```
+
+**Key concept — shipping is a skill:** Writing code is only part of software engineering. Packaging, versioning, and releasing it so others can actually use it is equally important. Many great tools die because the developer never learned to ship.
 
 ---
 
@@ -1011,7 +1832,9 @@ When using Claude or another LLM to coach you through these exercises:
 
 ---
 
-## Concept Map: AP CS Topics in ClipSort
+## Concept Map: AP CS Topics and Engineering Skills in ClipSort
+
+### Computer Science Concepts
 
 | AP CS Topic | Where It Shows Up in ClipSort |
 |---|---|
@@ -1031,3 +1854,22 @@ When using Claude or another LLM to coach you through these exercises:
 | Recursion | Recursive directory scanning |
 | Testing | pytest throughout every module |
 | Algorithm Design | Detection chain, candidate scoring, sampling strategies |
+
+### Software Engineering Skills
+
+| Skill | Where It Shows Up in ClipSort |
+|---|---|
+| Version Control (Git) | Every commit, branch, and merge throughout the project |
+| GitHub Workflow | Issues, pull requests, code review, branch protection |
+| Project Scaffolding | Directory structure, pyproject.toml, config files |
+| Virtual Environments | Isolating project dependencies with .venv |
+| Dependency Management | pyproject.toml, lock files, adding/updating packages |
+| Code Quality / Linting | ruff checks, pre-commit hooks |
+| Debugging | Stack traces, logging, systematic bug investigation |
+| Refactoring | Improving code structure without changing behavior |
+| CI/CD | GitHub Actions running tests and builds automatically |
+| Docker / Containerization | Dockerfile, docker-compose, volume mounts |
+| Releases & Versioning | Semantic versioning, tags, changelogs, GitHub releases |
+| Documentation | PRD, design docs, CLI help text, code comments |
+| SDLC / Planning | Requirements, design, roadmap, traceability |
+| Makefiles / Automation | Shortcuts for test, lint, build, clean |
