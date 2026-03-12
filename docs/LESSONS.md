@@ -22,7 +22,7 @@ git checkout checkpoint/module-N
 | `checkpoint/module-1` | Scaffolding + scanner + parser + ClipInfo with tests | You want to skip to building the organizer |
 | `checkpoint/module-2` | Full Phase 1 (scanner, parser, organizer, reporter, CLI, Docker) with all tests | You want to start QR code work |
 | `checkpoint/module-3` | Phase 1 + QR generator + QR detector + detection chain + video fixture infra | You want to start clapper board work |
-| `checkpoint/module-4` | Phase 1 + Phase 2 + Phase 3 (clapper detection, OCR, splitter) | You want to start engineering practices |
+| `checkpoint/module-4` | Phase 1 + Phase 2 + Phase 3 (clapper detection, OCR, splitter, audio clap detection) | You want to start engineering practices |
 
 **How checkpoints work:** Each branch contains the full, working code for everything up to that point. All tests pass on every checkpoint. You can compare your code against a checkpoint with `git diff checkpoint/module-N` to see what's different.
 
@@ -1412,17 +1412,26 @@ Try different heuristics and see what works.
 
 **Exercise 4.2a — Basic OCR**
 ```
-Install: pip install paddleocr
+Install: pip install pytesseract
+(Also requires Tesseract system package: brew install tesseract on Mac,
+or apt-get install tesseract-ocr on Linux/Docker)
 
-  from paddleocr import PaddleOCR
+  import pytesseract
+  from PIL import Image
 
-  ocr = PaddleOCR(use_angle_cls=True, lang='en')
-  result = ocr.ocr("your_image.jpg")
+  data = pytesseract.image_to_data(
+      Image.open("your_image.jpg"),
+      output_type=pytesseract.Output.DICT
+  )
 
-  for line in result[0]:
-      text = line[1][0]
-      confidence = line[1][1]
-      print(f"{text} (confidence: {confidence:.2f})")
+  for i, text in enumerate(data["text"]):
+      text = text.strip()
+      if not text:
+          continue
+      conf = float(data["conf"][i])
+      if conf < 0:
+          continue
+      print(f"{text} (confidence: {conf:.1f}%)")
 
 Try it on:
   - A photo of a clapper board
@@ -1528,6 +1537,211 @@ processing, detection algorithms, and subprocess management.
 ```
 
 **Key concept — integration:** The hardest part of software isn't writing individual pieces — it's making them work together. This exercise combines everything you've learned across all modules.
+
+---
+
+### Lesson 4.4: Audio Analysis and Signal Processing
+
+**Concepts:** PCM audio, sample rates, RMS energy, peak detection, data fusion
+
+**Background reading:** So far, all our detection has been *visual* — looking at pixels in video frames. But videos have audio too, and a clapper board makes a distinctive *clap* sound. Detecting that sound is a completely different kind of analysis: instead of 2D arrays of pixels, we work with 1D arrays of audio samples. This is **digital signal processing (DSP)** — a field that applies to everything from music apps to medical devices.
+
+The core idea: sound is a wave of air pressure changes over time. A microphone converts those pressure changes into numbers. We analyze those numbers to find the loud, sharp transient that is a clap.
+
+**Exercises:**
+
+**Exercise 4.4a — Audio as data: extracting sound from video**
+```
+In Lesson 3.2, we learned that images are 2D arrays of numbers.
+Audio is simpler: a 1D array of numbers, where each number represents
+air pressure at a moment in time.
+
+Key vocabulary:
+  - Sample rate: how many numbers per second (22050 Hz = 22050 samples/sec)
+  - Bit depth: range of each number (16-bit = -32768 to 32767)
+  - Mono vs stereo: 1 channel vs 2 channels
+
+Use FFmpeg to extract audio from a video as raw PCM data and load
+it into numpy:
+
+  import subprocess
+  import numpy as np
+
+  cmd = [
+      "ffmpeg",
+      "-i", "your_video.mp4",
+      "-ac", "1",             # mono (1 channel)
+      "-ar", "22050",         # 22050 samples per second
+      "-f", "s16le",          # raw 16-bit signed integers, little-endian
+      "-acodec", "pcm_s16le",
+      "pipe:1",               # write to stdout instead of a file
+  ]
+
+  result = subprocess.run(cmd, capture_output=True, check=True)
+  raw = np.frombuffer(result.stdout, dtype=np.int16)
+  audio = raw.astype(np.float32) / 32768.0  # normalize to [-1, 1]
+
+  print(f"Samples: {len(audio)}")
+  print(f"Duration: {len(audio) / 22050:.1f} seconds")
+  print(f"Min: {audio.min():.3f}, Max: {audio.max():.3f}")
+
+Notice "pipe:1" — instead of writing to a file, FFmpeg streams the
+raw bytes to stdout. In Lesson 4.3a we used capture_output to get
+text; here we capture raw binary data. Same pattern, different data.
+
+Experiment: try different sample rates (8000, 22050, 44100). How does
+the array size change? What's the tradeoff between quality and size?
+```
+
+**Exercise 4.4b — The sliding window pattern: computing an energy envelope**
+```
+We have thousands of audio samples per second. To detect a clap, we
+don't need to look at every individual sample — we need to know
+"how loud is the audio right now?"
+
+This is the SLIDING WINDOW pattern: take a long array, chop it into
+fixed-size windows, and compute one summary value per window. It's
+one of the most widely-used patterns in computer science.
+
+  import numpy as np
+
+  # Simulate 2 seconds of audio at 22050 Hz
+  audio = np.random.randn(44100).astype(np.float32) * 0.1
+
+  # Window parameters
+  window_ms = 20          # 20 millisecond windows
+  sample_rate = 22050
+  window_samples = int(sample_rate * window_ms / 1000)  # = 441
+
+  # Reshape the 1D array into a 2D array of windows
+  n_windows = len(audio) // window_samples
+  trimmed = audio[:n_windows * window_samples]
+  frames = trimmed.reshape(n_windows, window_samples)
+
+  # Compute RMS (Root Mean Square) energy per window
+  envelope = np.sqrt(np.mean(frames ** 2, axis=1))
+
+  print(f"Audio samples: {len(audio)}")
+  print(f"Window size: {window_samples} samples ({window_ms}ms)")
+  print(f"Envelope points: {len(envelope)}")
+
+The reshape trick turns a 1D problem into a 2D one:
+  - Before: [s0, s1, s2, ..., s44099]       (44100 values)
+  - After:  [[s0..s440], [s441..s881], ...]  (100 rows x 441 cols)
+
+Then np.mean(..., axis=1) collapses each row to one number.
+
+RMS (Root Mean Square) measures the "energy" of a signal. A loud
+sound like a clap will have high RMS; silence will be near zero.
+
+Try it with real audio from Exercise 4.4a. Can you spot where a
+clap happens by looking at the envelope values?
+```
+
+**Exercise 4.4c — Finding peaks: detecting claps with scipy**
+```
+Now we have an envelope where claps appear as sharp spikes. How do
+we automatically find those spikes?
+
+scipy.signal.find_peaks does exactly this:
+
+  from scipy.signal import find_peaks
+  import numpy as np
+
+  # Create a synthetic envelope with two "claps"
+  envelope = np.zeros(500)
+  envelope[100] = 0.9   # loud clap at position 100
+  envelope[300] = 0.8   # another clap at position 300
+  # Add some background noise
+  envelope += np.random.rand(500) * 0.05
+
+  # Find peaks
+  peaks, properties = find_peaks(
+      envelope,
+      distance=50,        # minimum 50 samples apart
+      prominence=0.3,     # must stand out by at least 0.3
+  )
+
+  print(f"Found {len(peaks)} peaks at positions: {peaks}")
+
+Two critical parameters:
+  - distance: minimum gap between peaks (avoids double-triggering)
+  - prominence: how much a peak must "stand out" from neighbors
+
+This is a TUNING problem. Like the heuristics in Lesson 4.1c,
+there's no single right answer:
+  - High prominence = fewer false positives, might miss quiet claps
+  - Low prominence = catches everything, including bumps and noise
+  - High distance = won't double-trigger, but misses rapid claps
+  - Low distance = catches rapid claps, but may double-trigger
+
+Try with real audio from Exercises 4.4a-b:
+  1. Compute the envelope of a video with known claps
+  2. Run find_peaks with different prominence values (0.3, 0.5, 0.7)
+  3. Convert peak positions to timestamps:
+     window_seconds = window_ms / 1000.0
+     timestamps = [int(p) * window_seconds for p in peaks]
+  4. Do the timestamps match where you hear the claps?
+```
+
+**Exercise 4.4d — Data fusion: merging audio and visual detections**
+```
+Now we have two independent ways to detect scene boundaries:
+  - Visual: QR codes, clapper boards, OCR (from Lessons 4.1-4.3)
+  - Audio: clap sounds (from Lessons 4.4a-c)
+
+Sometimes both detect the same scene change. Sometimes only one does.
+We need to MERGE them without duplicating split points.
+
+This is DATA FUSION: combining results from different detection
+sources into a single, better result.
+
+  def merge_timestamps(
+      visual: list[float],
+      audio: list[float],
+      dedup_window: float = 3.0,
+  ) -> list[float]:
+      """Merge visual and audio timestamps, removing near-duplicates.
+
+      Visual detections take priority because they carry scene/take
+      info. An audio timestamp within dedup_window seconds of any
+      existing point is considered a duplicate.
+      """
+      # Start with all visual detections (they have richer data)
+      merged = sorted(visual)
+
+      for ts in sorted(audio):
+          # Check if this audio detection is near any existing point
+          is_duplicate = any(
+              abs(ts - existing) <= dedup_window
+              for existing in merged
+          )
+          if not is_duplicate:
+              merged.append(ts)
+
+      return sorted(merged)
+
+  # Test it:
+  visual = [10.0, 30.5, 55.2]
+  audio = [10.3, 29.8, 42.0, 55.0]
+  result = merge_timestamps(visual, audio)
+  print(result)  # [10.0, 30.5, 42.0, 55.2]
+  # 10.3 merged with 10.0, 29.8 merged with 30.5, 55.0 merged with 55.2
+  # 42.0 is a NEW detection only audio caught!
+
+Think about:
+  - Why do visual detections take priority? (They have scene/take info)
+  - What happens if you make dedup_window too small? Too large?
+  - This is different from the detection chain (Lesson 3.3c) where
+    the first detector to succeed "wins." Here we COMBINE all results.
+
+This pattern appears everywhere: self-driving cars merge camera +
+lidar + radar data. Weather apps merge satellite + ground station
+readings. Any time you have multiple imperfect sensors, you fuse
+their results to get something better than either alone.
+```
+
+**Key concept — signal processing as a general skill:** The envelope-and-peaks pattern you just learned isn't specific to audio claps. The same approach works for ECG heart monitors (detecting heartbeats), seismographs (detecting earthquakes), stock price analysis (detecting price spikes), and fitness trackers (detecting footsteps). Learn it once, apply it everywhere. That's the power of studying the underlying computer science rather than just one application.
 
 ---
 
@@ -1992,6 +2206,7 @@ When using Claude or another LLM to coach you through these exercises:
 | Nested Loops | QR code batch generation (scenes x takes), frame sampling |
 | Arrays/Lists | Video frame arrays, file lists, plan mappings |
 | 2D Arrays | Image pixel data (height x width x channels) |
+| 1D Arrays / Signal Processing | Audio waveforms, energy envelopes, peak detection |
 | Strings | Filename parsing, regex patterns, QR data encoding |
 | Methods/Functions | Every component: `scan()`, `parse()`, `detect()`, `organize()` |
 | Classes/OOP | ClipInfo, FileScanner, FilenameParser, Organizer |
@@ -2002,6 +2217,8 @@ When using Claude or another LLM to coach you through these exercises:
 | Recursion | Recursive directory scanning |
 | Testing | pytest throughout every module |
 | Algorithm Design | Detection chain, candidate scoring, sampling strategies |
+| Parameter Tuning | Threshold/sensitivity tradeoffs in clap detection |
+| Data Fusion | Merging audio and visual detection results |
 
 ### Software Engineering Skills
 
@@ -2020,4 +2237,5 @@ When using Claude or another LLM to coach you through these exercises:
 | Releases & Versioning | Semantic versioning, tags, changelogs, GitHub releases |
 | Documentation | PRD, design docs, CLI help text, code comments |
 | SDLC / Planning | Requirements, design, roadmap, traceability |
+| Subprocess Piping | Streaming binary data from FFmpeg to numpy |
 | Makefiles / Automation | Shortcuts for test, lint, build, clean |
