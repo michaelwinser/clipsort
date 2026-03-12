@@ -196,7 +196,7 @@ UC-3001, UC-3002
 
 ---
 
-## Phase 3b: Video Splitting (Planned)
+## Phase 3b: Video Splitting
 
 **Goal:** Split continuous recordings at clapper board boundaries using FFmpeg.
 
@@ -213,9 +213,19 @@ UC-3001, UC-3002
 
 #### 3b.2 `split` CLI command
 - Implement `clipsort split <input-file> <output-dir>`
-- Options: `--mode qr|ocr|auto`, `--scan-seconds`, `--precise`
+- Options: `--mode qr|ocr|auto`, `--sample-rate`, `--precise`, `--skip-preamble`, `--slate-buffer`
 - Wire together detection + splitting pipeline
 - **Tests:** End-to-end split test with a multi-scene test video
+
+### Phase 3b Acceptance Criteria
+- [x] `SplitScanner` iterates frames with configurable sample rate and dedup window
+- [x] `VideoSplitter` splits with FFmpeg (stream copy or precise re-encode)
+- [x] `detect_frame()` methods added to `QRDetector` and `ClapperDetector`
+- [x] `clipsort split` CLI command with `--mode`, `--dry-run`, `--precise`, `--skip-preamble`, `--slate-buffer`
+- [x] Segment naming: `scene_01_take_01.mp4`, `preamble.mp4`, `segment_001.mp4`
+- [x] FFmpeg added to Docker image
+- [x] Wrapper scripts updated for `split` command
+- [x] All Phase 1, 2, and 3a tests still pass
 
 ### Use Cases Covered
 UC-3003

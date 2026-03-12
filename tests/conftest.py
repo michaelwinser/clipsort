@@ -191,3 +191,114 @@ def clapper_video(make_test_video):
         seconds=2,
         text_overlay={"scene": 3, "take": 2},
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 3b fixtures: multi-scene videos for splitting tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def make_multi_scene_video(tmp_path_factory):
+    """Factory that creates test videos with multiple scene markers at known timestamps.
+
+    Returns a callable: make(filename, scenes, *, width, height, fps, marker_type)
+
+    Each scene entry is a dict with:
+      - "time": timestamp in seconds where the marker appears
+      - "scene": scene number
+      - "take": take number (optional)
+
+    Default: 3 scenes at 0s, 7s, 14s in a 20s video.
+    """
+    cv2 = pytest.importorskip("cv2")
+    import json
+
+    import numpy as np
+
+    video_dir = tmp_path_factory.mktemp("multi_scene_videos")
+
+    def _make(
+        filename: str = "multi_scene.mp4",
+        scenes: list[dict] | None = None,
+        *,
+        total_seconds: int = 20,
+        width: int = 320,
+        height: int = 240,
+        fps: int = 5,
+        marker_type: str = "qr",
+    ) -> tuple[Path, list[dict]]:
+        if scenes is None:
+            scenes = [
+                {"time": 0, "scene": 1, "take": 1},
+                {"time": 7, "scene": 2, "take": 1},
+                {"time": 14, "scene": 3, "take": 1},
+            ]
+
+        path = video_dir / filename
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter(str(path), fourcc, fps, (width, height))
+
+        total_frames = fps * total_seconds
+        # How many frames each marker is visible (2 seconds for text/OCR,
+        # 1 frame for QR since a single frame is enough for decoding)
+        marker_duration_frames = fps * 2 if marker_type == "text" else 1
+
+        # Build a list of (start_frame, end_frame, scene_info) ranges
+        marker_ranges = []
+        for s in scenes:
+            start = int(s["time"] * fps)
+            end = min(start + marker_duration_frames, total_frames)
+            marker_ranges.append((start, end, s))
+
+        for i in range(total_frames):
+            # Different color per "segment" so they're visually distinguishable
+            segment_idx = 0
+            for s in scenes:
+                if i >= int(s["time"] * fps):
+                    segment_idx = s["scene"]
+            hue = (segment_idx * 60) % 180
+            frame = np.zeros((height, width, 3), dtype=np.uint8)
+            frame[:, :] = (hue, 128, 200)
+
+            # Check if this frame falls within any marker range
+            for start, end, scene_info in marker_ranges:
+                if start <= i < end:
+                    if marker_type == "qr":
+                        try:
+                            import qrcode
+
+                            data = json.dumps({
+                                "v": 1,
+                                "scene": scene_info["scene"],
+                                "take": scene_info.get("take", 1),
+                            })
+                            qr_img = qrcode.make(data).resize((100, 100))
+                            qr_np = np.array(qr_img.convert("RGB"))
+                            frame[10:110, 10:110] = qr_np
+                        except ImportError:
+                            pass
+                    elif marker_type == "text":
+                        # Draw text overlay like clapper board
+                        scene_num = scene_info["scene"]
+                        take_num = scene_info.get("take", 1)
+                        sx, sy = 20, 20
+                        ex, ey = width - 20, height - 20
+                        cv2.rectangle(frame, (sx, sy), (ex, ey), (255, 255, 255), -1)
+                        cv2.rectangle(frame, (sx, sy), (ex, ey), (0, 0, 0), 2)
+                        cv2.putText(
+                            frame, f"SCENE {scene_num}",
+                            (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2,
+                        )
+                        cv2.putText(
+                            frame, f"TAKE {take_num}",
+                            (30, 140), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2,
+                        )
+                    break  # Only draw one marker per frame
+
+            writer.write(frame)
+
+        writer.release()
+        return path, scenes
+
+    return _make

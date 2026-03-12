@@ -456,3 +456,61 @@ class TestDetectCLI:
         assert result.exit_code == 0
         assert "--mode" in result.output
         assert "auto" in result.output
+
+
+class TestSplitCLI:
+    def setup_method(self):
+        self.runner = CliRunner()
+
+    def test_split_help(self):
+        result = self.runner.invoke(main, ["split", "--help"])
+        assert result.exit_code == 0
+        assert "INPUT_FILE" in result.output
+        assert "OUTPUT_DIR" in result.output
+        assert "--mode" in result.output
+        assert "--sample-rate" in result.output
+        assert "--precise" in result.output
+        assert "--skip-preamble" in result.output
+        assert "--slate-buffer" in result.output
+        assert "--dry-run" in result.output
+
+    def test_split_missing_input(self):
+        result = self.runner.invoke(main, ["split", "/nonexistent/video.mp4", "/tmp/out"])
+        assert result.exit_code != 0
+
+    def test_split_with_mode(self):
+        """--mode qr is accepted in help output."""
+        result = self.runner.invoke(main, ["split", "--help"])
+        assert "auto" in result.output
+        assert "qr" in result.output
+        assert "ocr" in result.output
+
+    def test_help_shows_split_command(self):
+        result = self.runner.invoke(main, ["--help"])
+        assert result.exit_code == 0
+        assert "split" in result.output
+
+    @pytest.fixture(autouse=True)
+    def _skip_without_cv2(self):
+        pytest.importorskip("cv2")
+
+    def test_split_dry_run(self, make_multi_scene_video, tmp_path):
+        """Dry run shows the split plan without creating files."""
+        import shutil
+
+        pytest.importorskip("qrcode")
+        pytest.importorskip("pyzbar")
+
+        if shutil.which("ffmpeg") is None:
+            pytest.skip("ffmpeg not available")
+
+        video_path, _ = make_multi_scene_video("cli_dry_run.mp4")
+        output_dir = tmp_path / "output"
+
+        result = self.runner.invoke(
+            main,
+            ["split", str(video_path), str(output_dir), "--dry-run", "--mode", "qr"],
+        )
+        assert result.exit_code == 0
+        assert "dry run" in result.output
+        assert not output_dir.exists()

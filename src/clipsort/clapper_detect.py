@@ -43,6 +43,23 @@ class ClapperDetector:
         self.sample_rate = sample_rate
         self.min_confidence = min_confidence
 
+    def detect_frame(self, frame: np.ndarray) -> ClipInfo | None:
+        """Detect clapper board in a single frame.
+
+        Args:
+            frame: BGR image as a NumPy array.
+
+        Returns:
+            ClipInfo if a clapper board with readable text is found, None otherwise.
+        """
+        region = self._find_slate_region(frame)
+        if region is None:
+            return None
+
+        preprocessed = self._preprocess_slate(region)
+        ocr_results = self.ocr_engine.recognize(preprocessed)
+        return self._parse_ocr_results(ocr_results)
+
     def detect(self, video_path: Path) -> ClipInfo | None:
         """Scan video for a clapper board and extract scene/take info.
 
@@ -73,13 +90,7 @@ class ClapperDetector:
             if not ret:
                 break
 
-            region = self._find_slate_region(frame)
-            if region is None:
-                continue
-
-            preprocessed = self._preprocess_slate(region)
-            ocr_results = self.ocr_engine.recognize(preprocessed)
-            info = self._parse_ocr_results(ocr_results)
+            info = self.detect_frame(frame)
 
             if info is not None and info.confidence > best_confidence:
                 best_result = info

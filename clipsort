@@ -82,6 +82,72 @@ case "$subcommand" in
             "${IMAGE_NAME}" "${passthrough[@]}" /input /output
         ;;
 
+    split)
+        # split takes: SUBCOMMAND [OPTIONS] INPUT_FILE OUTPUT_DIR
+        # Mount the input file's parent directory (read-only) and remap the path.
+        passthrough=()
+        input_file=""
+        output_dir=""
+        positional_count=0
+        skip_next=false
+        found_sub=false
+
+        for arg in "$@"; do
+            if $skip_next; then
+                skip_next=false
+                passthrough+=("$arg")
+                continue
+            fi
+
+            if ! $found_sub; then
+                passthrough+=("$arg")
+                if [[ "$arg" == "$subcommand" ]]; then
+                    found_sub=true
+                fi
+                continue
+            fi
+
+            if [[ "$arg" == -* ]]; then
+                passthrough+=("$arg")
+                case "$arg" in
+                    --mode|--sample-rate|--slate-buffer) skip_next=true ;;
+                esac
+            else
+                positional_count=$((positional_count + 1))
+                if [[ $positional_count -eq 1 ]]; then
+                    input_file="$arg"
+                elif [[ $positional_count -eq 2 ]]; then
+                    output_dir="$arg"
+                else
+                    passthrough+=("$arg")
+                fi
+            fi
+        done
+
+        if [[ -z "$input_file" || -z "$output_dir" ]]; then
+            exec docker run --rm "${IMAGE_NAME}" "$@"
+        fi
+
+        # Resolve input file to absolute path
+        abs_input_file="$(cd "$(dirname "$input_file")" 2>/dev/null && pwd)/$(basename "$input_file")" || {
+            echo "Error: Input file '${input_file}' does not exist." >&2
+            exit 1
+        }
+        if [[ ! -f "$abs_input_file" ]]; then
+            echo "Error: Input file '${input_file}' does not exist." >&2
+            exit 1
+        fi
+
+        abs_input_dir="$(dirname "$abs_input_file")"
+        input_basename="$(basename "$abs_input_file")"
+        abs_output="$(mkdir -p "$output_dir" && cd "$output_dir" && pwd)"
+
+        exec docker run --rm \
+            -v "${abs_input_dir}:/input:ro" \
+            -v "${abs_output}:/output" \
+            "${IMAGE_NAME}" "${passthrough[@]}" "/input/${input_basename}" /output
+        ;;
+
     qr-generate)
         # No positional dir args — mount pwd as /work so output files land on host
         exec docker run --rm \

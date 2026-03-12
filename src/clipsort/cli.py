@@ -234,3 +234,124 @@ def detect(
     if report_file:
         reporter.save(plan, Path(report_file))
         click.echo(f"\nReport saved to {report_file}")
+
+
+@main.command()
+@click.argument("input_file", type=click.Path(exists=True, dir_okay=False))
+@click.argument("output_dir", type=click.Path())
+@click.option(
+    "--mode",
+    type=click.Choice(["auto", "qr", "ocr"]),
+    default="auto",
+    help="Detection mode (default: auto).",
+)
+@click.option("--sample-rate", type=float, default=1.0, help="Frames/sec to sample (default: 1.0).")
+@click.option("--precise", is_flag=True, help="Re-encode for frame-accurate cuts.")
+@click.option("--skip-preamble", is_flag=True, help="Discard content before first detection.")
+@click.option(
+    "--slate-buffer", type=float, default=0.5,
+    help="Seconds to skip after detection (default: 0.5).",
+)
+@click.option("--dry-run", is_flag=True, help="Show split plan without executing.")
+@click.option("--verbose", "-v", is_flag=True, help="Enable debug logging.")
+def split(
+    input_file: str,
+    output_dir: str,
+    mode: str,
+    sample_rate: float,
+    precise: bool,
+    skip_preamble: bool,
+    slate_buffer: float,
+    dry_run: bool,
+    verbose: bool,
+) -> None:
+    """Split a continuous video at detected scene boundaries.
+
+    Scans INPUT_FILE for QR codes and/or clapper boards throughout the full
+    duration, then splits into individual scene clips in OUTPUT_DIR.
+    """
+    if verbose:
+        logging.basicConfig(level=logging.DEBUG, format="%(name)s: %(message)s")
+
+    from clipsort.splitter import SplitScanner, VideoSplitter
+
+    # Check FFmpeg availability
+    try:
+        VideoSplitter.check_ffmpeg()
+    except RuntimeError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    # Build frame detectors based on mode
+    frame_detectors = []
+
+    if mode in ("auto", "qr"):
+        from clipsort.qr_detect import QRDetector
+
+        qr_detector = QRDetector()
+        frame_detectors.append(qr_detector.detect_frame)
+
+    if mode in ("auto", "ocr"):
+        from clipsort.clapper_detect import ClapperDetector
+        from clipsort.ocr import TesseractEngine
+
+        ocr_engine = TesseractEngine()
+        clapper_detector = ClapperDetector(ocr_engine=ocr_engine)
+        frame_detectors.append(clapper_detector.detect_frame)
+
+    if not frame_detectors:
+        click.echo("Error: No detection mode selected.", err=True)
+        sys.exit(1)
+
+    video_path = Path(input_file)
+    click.echo(f"Scanning {video_path.name} for scene markers...")
+
+    # Scan video
+    scanner = SplitScanner(
+        frame_detectors=frame_detectors,
+        sample_rate=sample_rate,
+    )
+    split_points = scanner.scan(video_path)
+
+    if not split_points:
+        click.echo("No scene markers detected.", err=True)
+        sys.exit(1)
+
+    click.echo(f"Found {len(split_points)} scene marker(s).")
+
+    # Get duration and compute segments
+    splitter = VideoSplitter(precise=precise)
+    duration = splitter.get_video_duration(video_path)
+    segments = splitter.compute_segments(
+        split_points, duration,
+        slate_buffer=slate_buffer,
+        skip_preamble=skip_preamble,
+    )
+
+    if not segments:
+        click.echo("No segments to extract.", err=True)
+        sys.exit(1)
+
+    # Display plan
+    click.echo(f"\nSplit plan ({len(segments)} segment(s)):")
+    for seg in segments:
+        end_str = f"{seg.end:.1f}s" if seg.end is not None else "end"
+        if seg.clip_info is None:
+            label = "preamble"
+        else:
+            label = f"scene {seg.clip_info.scene}"
+            if seg.clip_info.take is not None:
+                label += f" take {seg.clip_info.take}"
+        click.echo(f"  {seg.start:.1f}s - {end_str}: {label}")
+
+    if dry_run:
+        click.echo("\n(dry run — no files created)")
+        return
+
+    # Split
+    click.echo(f"\nSplitting into {Path(output_dir)}...")
+    paths = splitter.split(video_path, Path(output_dir), segments)
+
+    click.echo(f"\nCreated {len(paths)} file(s):")
+    for p in paths:
+        click.echo(f"  {p.name}")

@@ -7,6 +7,8 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
+import numpy as np
+
 from clipsort.parser import ClipInfo
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,25 @@ class QRDetector:
         self.scan_seconds = scan_seconds
         self.sample_rate = sample_rate
 
+    def detect_frame(self, frame: np.ndarray) -> ClipInfo | None:
+        """Scan a single frame for a QR code.
+
+        Args:
+            frame: BGR image as a NumPy array.
+
+        Returns:
+            ClipInfo if a valid QR code is found, None otherwise.
+        """
+        from pyzbar.pyzbar import decode as pyzbar_decode
+
+        decoded = pyzbar_decode(frame)
+        for obj in decoded:
+            raw = obj.data.decode("utf-8", errors="replace")
+            info = self._parse_qr_data(raw)
+            if info is not None:
+                return info
+        return None
+
     def detect(self, video_path: Path) -> ClipInfo | None:
         """Scan video frames for a QR code and return parsed metadata.
 
@@ -35,7 +56,6 @@ class QRDetector:
             ClipInfo if a valid QR code is found, None otherwise.
         """
         import cv2
-        from pyzbar.pyzbar import decode as pyzbar_decode
 
         cap = cv2.VideoCapture(str(video_path))
         if not cap.isOpened():
@@ -53,14 +73,11 @@ class QRDetector:
             if not ret:
                 break
 
-            decoded = pyzbar_decode(frame)
-            for obj in decoded:
-                raw = obj.data.decode("utf-8", errors="replace")
-                info = self._parse_qr_data(raw)
-                if info is not None:
-                    cap.release()
-                    logger.debug("QR found at frame %d in %s", frame_idx, video_path.name)
-                    return info
+            info = self.detect_frame(frame)
+            if info is not None:
+                cap.release()
+                logger.debug("QR found at frame %d in %s", frame_idx, video_path.name)
+                return info
 
         cap.release()
         return None
