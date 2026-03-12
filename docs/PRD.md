@@ -267,7 +267,7 @@ ClipSort is a command-line tool, packaged as a Docker container, that helps stud
 - Confidence score is reported for each OCR result
 - Low-confidence results trigger a warning and fallback
 
-#### UC-3003: Split a continuous video file at clapper board boundaries *(Phase 3b — Planned)*
+#### UC-3003: Split a continuous video file at clapper board boundaries *(Phase 3b — Implemented)*
 
 **Actor:** Student Filmmaker
 **Precondition:** A single long video file contains multiple scenes separated by clapper boards
@@ -286,21 +286,27 @@ ClipSort is a command-line tool, packaged as a Docker container, that helps stud
 - Each output clip has a meaningful filename
 - Original file is not modified
 
-#### UC-3004: Audio-based clap detection as supplementary signal *(Phase 3c — Planned)*
+#### UC-3004: Audio-based clap detection *(Phase 3c — Planned)*
 
 **Actor:** Student Filmmaker
-**Precondition:** Clapper board produces an audible "clap" sound
-**Trigger:** Used internally as part of the detection pipeline
+**Precondition:** Scenes in a continuous recording are separated by audible hand claps (with or without a visual clapper board)
+**Trigger:** User runs `clipsort split --mode audio <input-file> <output-dir>` or `--mode auto`
 **Flow:**
-1. Tool extracts audio track from video
-2. Tool analyzes audio for sharp transient peaks (clap sounds)
-3. Detected audio claps are correlated with visual clapper detections for higher accuracy
+1. Tool extracts audio track from video using FFmpeg
+2. Tool computes an energy envelope over the audio waveform
+3. Tool detects sharp transient peaks (clap sounds) using prominence-based peak detection
+4. Each clap becomes a split point timestamp
+5. In `auto` mode, audio clap timestamps are merged with visual (QR/OCR) detections, deduplicating timestamps that are close together
+6. In `audio` mode, audio runs standalone — each clap produces a generic split point (no scene/take metadata)
 
-**Postcondition:** Clap timestamps are available as supplementary detection data
+**Postcondition:** Video is split at clap boundaries. In audio-only mode, clips are named generically (`segment_001.mp4`, etc.) — the user reads any handwritten notes visible at the start of each clip to identify scenes.
 **Acceptance Criteria:**
-- Audio claps are detected with >70% accuracy
-- Audio detection supplements (not replaces) visual detection
+- Audio claps are detected with >70% accuracy on clear recordings
+- `--mode audio` works standalone for the simplest workflow (hand clap + piece of paper)
+- `--mode auto` merges audio claps with visual detections
+- Configurable sensitivity via `--clap-threshold`
 - False positive rate is manageable (< 20%)
+- No heavy dependencies (uses scipy, not librosa)
 
 ---
 

@@ -110,7 +110,7 @@ case "$subcommand" in
             if [[ "$arg" == -* ]]; then
                 passthrough+=("$arg")
                 case "$arg" in
-                    --mode|--sample-rate|--slate-buffer) skip_next=true ;;
+                    --mode|--sample-rate|--slate-buffer|--clap-threshold) skip_next=true ;;
                 esac
             else
                 positional_count=$((positional_count + 1))

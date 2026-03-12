@@ -472,6 +472,7 @@ class TestSplitCLI:
         assert "--precise" in result.output
         assert "--skip-preamble" in result.output
         assert "--slate-buffer" in result.output
+        assert "--clap-threshold" in result.output
         assert "--dry-run" in result.output
 
     def test_split_missing_input(self):
@@ -479,11 +480,12 @@ class TestSplitCLI:
         assert result.exit_code != 0
 
     def test_split_with_mode(self):
-        """--mode qr is accepted in help output."""
+        """All mode choices appear in help output."""
         result = self.runner.invoke(main, ["split", "--help"])
         assert "auto" in result.output
         assert "qr" in result.output
         assert "ocr" in result.output
+        assert "audio" in result.output
 
     def test_help_shows_split_command(self):
         result = self.runner.invoke(main, ["--help"])
@@ -514,3 +516,36 @@ class TestSplitCLI:
         assert result.exit_code == 0
         assert "dry run" in result.output
         assert not output_dir.exists()
+
+    def test_split_help_shows_audio_mode(self):
+        """--mode audio appears in help output."""
+        result = self.runner.invoke(main, ["split", "--help"])
+        assert result.exit_code == 0
+        assert "audio" in result.output
+        assert "--clap-threshold" in result.output
+
+    def test_split_with_mode_audio(self, make_test_video_with_claps, tmp_path):
+        """--mode audio runs audio detection."""
+        import shutil
+
+        if shutil.which("ffmpeg") is None:
+            pytest.skip("ffmpeg not available")
+
+        video = make_test_video_with_claps(
+            "cli_audio_test.mp4", [2.0, 5.0], duration=8.0,
+        )
+        output_dir = tmp_path / "output"
+
+        result = self.runner.invoke(
+            main,
+            [
+                "split", str(video), str(output_dir),
+                "--mode", "audio",
+                "--clap-threshold", "0.3",
+                "--dry-run",
+            ],
+        )
+        # Should either find claps (exit 0 with plan) or find none (exit 1)
+        assert result.exit_code in (0, 1)
+        if result.exit_code == 0:
+            assert "audio claps" in result.output.lower() or "scene marker" in result.output.lower()

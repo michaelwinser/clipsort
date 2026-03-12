@@ -199,6 +199,84 @@ def clapper_video(make_test_video):
 
 
 @pytest.fixture(scope="session")
+def make_test_video_with_claps(tmp_path_factory):
+    """Create test videos with audible clap sounds at known timestamps.
+
+    Uses FFmpeg's sine/noise audio filters to generate sharp transients
+    against a silent background. Returns a callable:
+
+        make(filename, clap_times, *, duration, width, height, fps) -> Path
+
+    Args:
+        filename: Output filename.
+        clap_times: List of timestamps (seconds) for clap sounds.
+        duration: Total video duration in seconds.
+    """
+    import shutil
+
+    video_dir = tmp_path_factory.mktemp("clap_videos")
+
+    def _make(
+        filename: str = "clap_test.mp4",
+        clap_times: list[float] | None = None,
+        *,
+        duration: float = 10.0,
+        width: int = 320,
+        height: int = 240,
+        fps: int = 5,
+    ) -> Path:
+        if shutil.which("ffmpeg") is None:
+            pytest.skip("ffmpeg not available")
+
+        if clap_times is None:
+            clap_times = [2.0, 5.0, 8.0]
+
+        path = video_dir / filename
+
+        # Build an audio filter that produces silence with short noise bursts at clap times.
+        # Each clap is a 30ms burst of white noise at full volume.
+        clap_duration = 0.03
+        if clap_times:
+            # Generate silence, then overlay noise bursts at each clap time
+            # aevalsrc generates silence for the full duration
+            # For each clap, we generate a short noise burst and delay it
+            parts = []
+            for i, t in enumerate(clap_times):
+                parts.append(
+                    f"anoisesrc=d={clap_duration}:c=white:a=1.0[c{i}];"
+                    f"[c{i}]adelay={int(t * 1000)}|{int(t * 1000)}[d{i}]"
+                )
+            # Create silence base
+            filter_parts = [f"anullsrc=r=22050:cl=mono,atrim=0:{duration}[base]"]
+            filter_parts.extend(parts)
+            # Mix all together
+            mix_inputs = "[base]" + "".join(f"[d{i}]" for i in range(len(clap_times)))
+            filter_parts.append(
+                f"{mix_inputs}amix=inputs={len(clap_times) + 1}:duration=first:normalize=0"
+            )
+            audio_filter = ";".join(filter_parts)
+        else:
+            audio_filter = f"anullsrc=r=22050:cl=mono,atrim=0:{duration}"
+
+        cmd = [
+            "ffmpeg", "-y",
+            # Generate blank video
+            "-f", "lavfi", "-i", f"color=c=black:s={width}x{height}:r={fps}:d={duration}",
+            # Generate audio with claps
+            "-f", "lavfi", "-i", audio_filter,
+            "-c:v", "libx264", "-c:a", "aac",
+            "-shortest",
+            str(path),
+        ]
+
+        subprocess.run(cmd, capture_output=True, check=True)
+        return path
+
+    import subprocess
+    return _make
+
+
+@pytest.fixture(scope="session")
 def make_multi_scene_video(tmp_path_factory):
     """Factory that creates test videos with multiple scene markers at known timestamps.
 

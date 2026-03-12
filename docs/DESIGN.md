@@ -221,7 +221,35 @@ class VideoSplitter:
 - Add 0.5s buffer after each clapper detection to skip the slate itself
 - For frame-accurate cuts, offer an optional `--precise` flag that re-encodes
 
-### 2.8 Organizer
+### 2.8 Audio Clap Detector (Phase 3c)
+
+Detects audible clap sounds in video audio tracks to identify scene boundaries. Designed for the simplest possible workflow: a student holds up a piece of paper with scene info and claps their hands. No QR codes, no legible slate required.
+
+```python
+class AudioClapDetector:
+    def __init__(self, sample_rate=22050, window_ms=20.0,
+                 min_gap=2.0, threshold=0.6): ...
+    def detect_timestamps(self, video_path: Path) -> list[float]: ...
+    def _extract_audio(self, video_path: Path) -> np.ndarray: ...
+    def _compute_envelope(self, audio: np.ndarray) -> np.ndarray: ...
+    def _find_claps(self, envelope: np.ndarray) -> list[float]: ...
+```
+
+**Audio Extraction:** FFmpeg pipes mono 16-bit PCM at 22050 Hz to stdout. No temp files. Parsed directly into a numpy array.
+
+**Detection Strategy:**
+1. Compute RMS energy envelope over sliding windows (20ms default)
+2. Use `scipy.signal.find_peaks` with prominence-based filtering to find sharp transients
+3. `min_gap` parameter (default 2s) prevents double-triggering on reverberant claps
+4. `threshold` controls sensitivity as a fraction of max energy (default 0.6)
+
+**Integration Modes:**
+- **Standalone** (`--mode audio`): Each clap becomes a split point with no scene/take metadata. Output clips are named `segment_001.mp4`, etc.
+- **Supplement** (`--mode auto`): Audio clap timestamps are merged with visual (QR/OCR) detections after frame scanning. Deduplicated against existing split points within the dedup window.
+
+**Why not librosa?** scipy's `find_peaks` on an RMS envelope is sufficient for clap detection. librosa adds ~150MB (numba/llvmlite) for spectral features we don't need.
+
+### 2.9 Organizer
 
 Builds and executes the file organization plan.
 
@@ -244,7 +272,7 @@ class Organizer:
 **Conflict Resolution:**
 When two files map to the same destination, append `_2`, `_3`, etc. before the extension.
 
-### 2.9 Reporter
+### 2.10 Reporter
 
 Generates human-readable summaries of operations.
 
@@ -273,8 +301,9 @@ clipsort/
       parser.py            # FilenameParser, ClipInfo
       qr_detect.py         # QRDetector
       qr_generate.py       # QRGenerator
-      clapper_detect.py    # ClapperDetector (Phase 3)
-      splitter.py          # VideoSplitter (Phase 3)
+      clapper_detect.py    # ClapperDetector (Phase 3a)
+      audio_detect.py      # AudioClapDetector (Phase 3c)
+      splitter.py          # VideoSplitter (Phase 3b)
       organizer.py         # Organizer, OrganizePlan
       reporter.py          # Reporter
   tests/
@@ -285,6 +314,7 @@ clipsort/
     test_qr_generate.py
     test_clapper_detect.py
     test_splitter.py
+    test_audio_detect.py
     test_organizer.py
     test_reporter.py
     test_cli.py            # Integration tests
@@ -307,7 +337,7 @@ clipsort/
 | PDF Generation | fpdf2 | Lightweight, no system dependencies |
 | OCR | Tesseract (via pytesseract) | Lightweight (~50MB apt package), behind OCREngine abstraction; PaddleOCR can be swapped in later |
 | Video Splitting | FFmpeg (subprocess) | Industry standard, stream copy support |
-| Audio Analysis | librosa | Feature extraction for clap detection |
+| Audio Analysis | scipy + FFmpeg | Lightweight transient detection via energy envelope + peak finding |
 | Testing | pytest | Standard Python test framework |
 | Linting | ruff | Fast, replaces flake8 + isort + black |
 | Docker Base | python:3.12-slim | Small base image |

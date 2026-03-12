@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libzbar0 tesser
 COPY pyproject.toml .
 COPY src/ src/
 
-RUN pip install --no-cache-dir --prefix=/install ".[qr,ocr]"
+RUN pip install --no-cache-dir --prefix=/install ".[qr,ocr,audio]"
 
 # Dev stage — includes test/lint tools and test files
 FROM python:3.12-slim AS dev
@@ -16,7 +16,7 @@ COPY pyproject.toml .
 COPY src/ src/
 COPY tests/ tests/
 
-RUN pip install --no-cache-dir -e ".[dev,qr,ocr]"
+RUN pip install --no-cache-dir -e ".[dev,qr,ocr,audio]"
 
 # Production stage
 FROM python:3.12-slim

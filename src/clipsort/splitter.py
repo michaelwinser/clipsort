@@ -23,7 +23,7 @@ class SplitPoint:
     """A detected scene marker at a specific timestamp."""
 
     timestamp: float  # Seconds from video start
-    clip_info: ClipInfo
+    clip_info: ClipInfo | None
 
 
 @dataclass
@@ -92,25 +92,43 @@ class SplitScanner:
                     candidate = SplitPoint(timestamp=timestamp, clip_info=info)
                     if not self._is_duplicate(candidate, split_points):
                         split_points.append(candidate)
-                        logger.debug(
-                            "Split point at %.1fs: scene=%d in %s",
-                            timestamp,
-                            info.scene,
-                            video_path.name,
-                        )
+                        if info is not None:
+                            logger.debug(
+                                "Split point at %.1fs: scene=%d in %s",
+                                timestamp,
+                                info.scene,
+                                video_path.name,
+                            )
+                        else:
+                            logger.debug(
+                                "Split point at %.1fs in %s",
+                                timestamp,
+                                video_path.name,
+                            )
                     break  # First detector wins for this frame
 
         cap.release()
         return split_points
 
     def _is_duplicate(self, candidate: SplitPoint, existing: list[SplitPoint]) -> bool:
-        """Check if a candidate is a duplicate of a recent detection."""
-        for point in reversed(existing):
-            time_gap = candidate.timestamp - point.timestamp
+        """Check if a candidate is a duplicate of a recent detection.
+
+        A candidate is duplicate if within the dedup window there is:
+        - A point with matching scene/take (both have clip_info), or
+        - Any point at all, when the candidate has no clip_info (audio).
+          Audio-only split points near any existing point are redundant.
+        """
+        for point in existing:
+            time_gap = abs(candidate.timestamp - point.timestamp)
             if time_gap > self.dedup_window:
-                break
+                continue
+            # Audio candidate (no clip_info) is duplicate if near any existing point
+            if candidate.clip_info is None:
+                return True
+            # Visual candidate: check if scene/take match
             if (
-                candidate.clip_info.scene == point.clip_info.scene
+                point.clip_info is not None
+                and candidate.clip_info.scene == point.clip_info.scene
                 and candidate.clip_info.take == point.clip_info.take
             ):
                 return True

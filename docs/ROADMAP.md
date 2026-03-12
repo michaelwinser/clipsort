@@ -232,24 +232,43 @@ UC-3003
 
 ---
 
-## Phase 3c: Audio Clap Detection (Planned)
+## Phase 3c: Audio Clap Detection
 
 **Goal:** Detect audible clapper "clap" sounds as a supplementary detection signal.
 
-**Prerequisite:** Phase 3a complete.
+**Prerequisite:** Phase 3b complete.
 
 ### Tasks
 
-#### 3c.1 Audio clap detection
-- Extract audio track using FFmpeg
-- Detect sharp transient peaks using librosa
-- Correlate audio claps with visual detections
-- **Tests:** Clap detection on test audio with known clap positions
+#### 3c.1 Audio clap detection (`audio_detect.py`)
+- Extract audio track via FFmpeg as raw PCM (mono, 22050 Hz)
+- Compute short-time RMS energy envelope
+- Detect sharp transient peaks using `scipy.signal.find_peaks` with prominence filtering
+- Configurable threshold, min gap, window size
+- **Tests:** Envelope computation on synthetic signals, peak detection on synthetic envelopes, end-to-end on generated test videos
 
-#### 3c.2 Docker update
-- Add librosa and audio dependencies
-- Optimize image size
-- **Tests:** Docker smoke test with audio detection
+#### 3c.2 CLI integration
+- `--mode audio` for audio-only clap detection in `split` command
+- In `--mode auto`, audio runs as post-pass and merges timestamps with visual detections
+- `--clap-threshold` option for sensitivity control
+- Audio-detected split points have `clip_info=None` (no scene info)
+- **Tests:** CLI integration tests for audio mode and clap-threshold flag
+
+#### 3c.3 Docker update
+- Add scipy to audio optional dependency group
+- Updated Docker pip install to include `.[qr,ocr,audio]`
+- No new apt packages needed (FFmpeg already installed)
+- **Tests:** Docker build with scipy, full test suite
+
+### Phase 3c Acceptance Criteria
+- [x] `AudioClapDetector` extracts audio via FFmpeg and detects claps
+- [x] `--mode audio` runs standalone audio detection
+- [x] `--mode auto` merges audio claps with visual detections (deduplication)
+- [x] `--clap-threshold` flag controls detection sensitivity
+- [x] Audio split points produce `segment_NNN` output filenames
+- [x] scipy added as `audio` optional dependency (~30MB vs ~150MB for librosa)
+- [x] Wrapper scripts updated for `--clap-threshold`
+- [x] All Phase 1, 2, 3a, and 3b tests still pass
 
 ### Use Cases Covered
 UC-3004

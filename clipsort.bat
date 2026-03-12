@@ -108,6 +108,7 @@ for %%a in (%*) do (
             if "%%a"=="--mode" set SKIP_NEXT=1
             if "%%a"=="--sample-rate" set SKIP_NEXT=1
             if "%%a"=="--slate-buffer" set SKIP_NEXT=1
+            if "%%a"=="--clap-threshold" set SKIP_NEXT=1
         ) else (
             set /a POSITIONAL_COUNT+=1
             if !POSITIONAL_COUNT!==1 (

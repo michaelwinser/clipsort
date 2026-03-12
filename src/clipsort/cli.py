@@ -241,7 +241,7 @@ def detect(
 @click.argument("output_dir", type=click.Path())
 @click.option(
     "--mode",
-    type=click.Choice(["auto", "qr", "ocr"]),
+    type=click.Choice(["auto", "qr", "ocr", "audio"]),
     default="auto",
     help="Detection mode (default: auto).",
 )
@@ -251,6 +251,10 @@ def detect(
 @click.option(
     "--slate-buffer", type=float, default=0.5,
     help="Seconds to skip after detection (default: 0.5).",
+)
+@click.option(
+    "--clap-threshold", type=float, default=0.6,
+    help="Audio clap detection sensitivity (default: 0.6).",
 )
 @click.option("--dry-run", is_flag=True, help="Show split plan without executing.")
 @click.option("--verbose", "-v", is_flag=True, help="Enable debug logging.")
@@ -262,18 +266,20 @@ def split(
     precise: bool,
     skip_preamble: bool,
     slate_buffer: float,
+    clap_threshold: float,
     dry_run: bool,
     verbose: bool,
 ) -> None:
     """Split a continuous video at detected scene boundaries.
 
-    Scans INPUT_FILE for QR codes and/or clapper boards throughout the full
-    duration, then splits into individual scene clips in OUTPUT_DIR.
+    Scans INPUT_FILE for QR codes, clapper boards, and/or audio claps
+    throughout the full duration, then splits into individual scene clips
+    in OUTPUT_DIR.
     """
     if verbose:
         logging.basicConfig(level=logging.DEBUG, format="%(name)s: %(message)s")
 
-    from clipsort.splitter import SplitScanner, VideoSplitter
+    from clipsort.splitter import SplitPoint, SplitScanner, VideoSplitter
 
     # Check FFmpeg availability
     try:
@@ -282,36 +288,60 @@ def split(
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
-    # Build frame detectors based on mode
-    frame_detectors = []
-
-    if mode in ("auto", "qr"):
-        from clipsort.qr_detect import QRDetector
-
-        qr_detector = QRDetector()
-        frame_detectors.append(qr_detector.detect_frame)
-
-    if mode in ("auto", "ocr"):
-        from clipsort.clapper_detect import ClapperDetector
-        from clipsort.ocr import TesseractEngine
-
-        ocr_engine = TesseractEngine()
-        clapper_detector = ClapperDetector(ocr_engine=ocr_engine)
-        frame_detectors.append(clapper_detector.detect_frame)
-
-    if not frame_detectors:
-        click.echo("Error: No detection mode selected.", err=True)
-        sys.exit(1)
-
     video_path = Path(input_file)
-    click.echo(f"Scanning {video_path.name} for scene markers...")
+    split_points: list[SplitPoint] = []
 
-    # Scan video
-    scanner = SplitScanner(
-        frame_detectors=frame_detectors,
-        sample_rate=sample_rate,
-    )
-    split_points = scanner.scan(video_path)
+    if mode == "audio":
+        # Audio-only mode — skip frame detectors
+        from clipsort.audio_detect import AudioClapDetector
+
+        click.echo(f"Scanning {video_path.name} for audio claps...")
+        detector = AudioClapDetector(threshold=clap_threshold)
+        timestamps = detector.detect_timestamps(video_path)
+        split_points = [SplitPoint(timestamp=t, clip_info=None) for t in timestamps]
+    else:
+        # Build frame detectors based on mode
+        frame_detectors = []
+
+        if mode in ("auto", "qr"):
+            from clipsort.qr_detect import QRDetector
+
+            qr_detector = QRDetector()
+            frame_detectors.append(qr_detector.detect_frame)
+
+        if mode in ("auto", "ocr"):
+            from clipsort.clapper_detect import ClapperDetector
+            from clipsort.ocr import TesseractEngine
+
+            ocr_engine = TesseractEngine()
+            clapper_detector = ClapperDetector(ocr_engine=ocr_engine)
+            frame_detectors.append(clapper_detector.detect_frame)
+
+        if not frame_detectors:
+            click.echo("Error: No detection mode selected.", err=True)
+            sys.exit(1)
+
+        click.echo(f"Scanning {video_path.name} for scene markers...")
+
+        # Scan video for visual markers
+        scanner = SplitScanner(
+            frame_detectors=frame_detectors,
+            sample_rate=sample_rate,
+        )
+        split_points = scanner.scan(video_path)
+
+        # In auto mode, run audio as a post-pass and merge new timestamps
+        if mode == "auto":
+            from clipsort.audio_detect import AudioClapDetector
+
+            click.echo("Scanning for audio claps...")
+            audio_detector = AudioClapDetector(threshold=clap_threshold)
+            audio_timestamps = audio_detector.detect_timestamps(video_path)
+            for t in audio_timestamps:
+                candidate = SplitPoint(timestamp=t, clip_info=None)
+                if not scanner._is_duplicate(candidate, split_points):
+                    split_points.append(candidate)
+            split_points.sort(key=lambda sp: sp.timestamp)
 
     if not split_points:
         click.echo("No scene markers detected.", err=True)
@@ -337,7 +367,7 @@ def split(
     for seg in segments:
         end_str = f"{seg.end:.1f}s" if seg.end is not None else "end"
         if seg.clip_info is None:
-            label = "preamble"
+            label = "preamble" if seg.index == 0 else f"segment {seg.index:03d}"
         else:
             label = f"scene {seg.clip_info.scene}"
             if seg.clip_info.take is not None:
