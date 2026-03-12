@@ -17,6 +17,8 @@ The wrapper scripts handle Docker volume mounts automatically — you just use l
 
 ## Usage
 
+### `organize` — sort clips by filename
+
 ```
 ./clipsort organize [OPTIONS] INPUT_DIR OUTPUT_DIR
 ```
@@ -28,6 +30,30 @@ The wrapper scripts handle Docker volume mounts automatically — you just use l
 | `-r`, `--recursive` | Scan subdirectories for video files |
 | `-v`, `--verbose` | Enable debug logging |
 | `--report-file PATH` | Save the summary report to a file |
+
+### `detect` — sort clips using QR codes (with filename fallback)
+
+```
+./clipsort detect [OPTIONS] INPUT_DIR OUTPUT_DIR
+```
+
+Same options as `organize`, plus:
+
+| Option | Description |
+|--------|-------------|
+| `--scan-seconds N` | Seconds of video to scan for QR codes (default: 10) |
+| `--sample-rate N` | Frames per second to sample (default: 2) |
+
+Scans each video for QR codes first; falls back to filename parsing if no QR is found.
+
+### `qr-generate` — create QR codes for clapper boards
+
+```
+./clipsort qr-generate --scene 1 --take 1 [--project NAME] [--output PATH]
+./clipsort qr-generate --scenes 5 --takes 3 [--project NAME] [--output PATH]
+```
+
+Single mode (`--scene`/`--take`) outputs a PNG. Batch mode (`--scenes`/`--takes`) outputs a printable PDF sheet.
 
 ### Supported filename patterns
 
@@ -64,20 +90,13 @@ Unsorted: 1 file(s)
 
 ## Development
 
-```bash
-make help       # Show available commands
-make test       # Run tests (56 tests)
-make lint       # Check code quality with ruff
-make test-cov   # Tests with coverage report
-make build      # Build Docker image
-```
-
-Or run everything in Docker (no local Python install needed):
+Everything runs in Docker — no local Python install needed:
 
 ```bash
-docker build --target dev -t clipsort-dev .
-docker run --rm clipsort-dev pytest tests/ -v
-docker run --rm clipsort-dev ruff check src/ tests/
+docker build --target dev -t clipsort-dev .         # Build dev image
+docker run --rm clipsort-dev pytest tests/ -v        # Run tests (83 tests)
+docker run --rm clipsort-dev ruff check src/ tests/  # Check code quality
+docker build -t clipsort .                           # Build production image
 ```
 
 ## Project Structure
@@ -90,6 +109,8 @@ build.bat           # Build script (Windows)
 src/clipsort/
   scanner.py      # Find video files in directories
   parser.py       # Extract scene/take from filenames
+  qr_generate.py  # Generate QR codes for clapper boards
+  qr_detect.py    # Detect QR codes in video frames
   organizer.py    # Build and execute file organization plans
   reporter.py     # Generate summary reports
   cli.py          # Click CLI entry point
@@ -118,6 +139,6 @@ See the Checkpoints section in `docs/LESSONS.md` for details on what each contai
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 1. Filename Organizer | Done | Parse filenames, organize into scene folders |
-| 2. QR Code Detection | Planned | Generate QR codes for clappers, detect in video |
+| 2. QR Code Detection | Done | Generate QR codes for clappers, detect in video |
 | 3. Clapper Board OCR | Planned | Visual slate detection, OCR, video splitting |
 | 4. Polish | Planned | Custom patterns, config files, UX improvements |

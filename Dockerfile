@@ -1,23 +1,27 @@
 FROM python:3.12-slim AS builder
 
 WORKDIR /build
+RUN apt-get update && apt-get install -y --no-install-recommends libzbar0 && rm -rf /var/lib/apt/lists/*
 COPY pyproject.toml .
 COPY src/ src/
 
-RUN pip install --no-cache-dir --prefix=/install .
+RUN pip install --no-cache-dir --prefix=/install ".[qr]"
 
 # Dev stage — includes test/lint tools and test files
 FROM python:3.12-slim AS dev
 
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends libzbar0 && rm -rf /var/lib/apt/lists/*
 COPY pyproject.toml .
 COPY src/ src/
 COPY tests/ tests/
 
-RUN pip install --no-cache-dir -e ".[dev]"
+RUN pip install --no-cache-dir -e ".[dev,qr]"
 
 # Production stage
 FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends libzbar0 && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
 

@@ -10,6 +10,7 @@ class TestOrganizePlan:
         assert plan.mappings == []
         assert plan.unsorted == []
         assert plan.conflicts == []
+        assert plan.methods == {}
 
 
 class TestOrganizer:
@@ -68,6 +69,22 @@ class TestOrganizer:
 
         _, dest = plan.mappings[0]
         assert dest.parent.name == "Scene 1"
+
+    def test_plan_tracks_methods(self, tmp_path):
+        files = [
+            (tmp_path / "1a.mp4", ClipInfo(scene=1, take="a", method="filename:scene_letter")),
+            (tmp_path / "2a.mp4", ClipInfo(scene=2, take="a", method="qr")),
+            (tmp_path / "random.mp4", None),
+        ]
+        output = tmp_path / "out"
+        plan = self.organizer.plan(files, output)
+
+        assert plan.methods == {
+            "1a.mp4": "filename:scene_letter",
+            "2a.mp4": "qr",
+        }
+        # Unsorted files should not appear in methods
+        assert "random.mp4" not in plan.methods
 
     def test_execute_copies_files(self, sample_video_dir, tmp_path):
         from clipsort.parser import FilenameParser

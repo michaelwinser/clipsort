@@ -36,6 +36,11 @@ class Reporter:
             for source, attempted, actual in plan.conflicts:
                 stream.write(f"  {source.name}: {attempted.name} -> {actual.name}\n")
 
+        if plan.methods:
+            stream.write("Detection methods:\n")
+            for name in sorted(plan.methods):
+                stream.write(f"  {name}: {plan.methods[name]}\n")
+
     def save(self, plan: OrganizePlan, path: Path) -> None:
         """Save the report to a file."""
         with open(path, "w") as f:

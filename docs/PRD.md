@@ -197,6 +197,23 @@ ClipSort is a command-line tool, packaged as a Docker container, that helps stud
 - Each QR code is labeled with its scene and take number
 - PDF is formatted for standard letter or A4 paper
 
+#### UC-2005: Include human-readable text on QR code images
+
+**Actor:** Mentor / Production Coordinator
+**Precondition:** QR codes are being generated for clapper boards
+**Trigger:** User runs `clipsort qr-generate` (single or batch mode)
+**Flow:**
+1. Tool generates the QR code as usual
+2. Tool renders a human-readable label below the QR code showing scene, take, and project name (if provided)
+3. For single PNGs: the label is composited into the image
+4. For batch PDFs: the label appears below each QR code (already present, enhanced with project name)
+
+**Postcondition:** Every QR code has a visible text label that can be read without scanning
+**Acceptance Criteria:**
+- Single PNG includes a text label below the QR code (e.g., "Scene 1 Take 2" or "MyFilm — Scene 1 Take 2")
+- Batch PDF labels include the project name when provided
+- The QR code itself remains scannable (label does not overlap the code)
+
 #### UC-2004: Handle videos without QR codes gracefully
 
 **Actor:** Student Filmmaker

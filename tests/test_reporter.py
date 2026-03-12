@@ -71,6 +71,34 @@ class TestReporter:
         assert "Files processed: 0" in output
         assert "Scenes detected: 0" in output
 
+    def test_report_with_methods(self):
+        plan = OrganizePlan(
+            mappings=[
+                (Path("1a.mp4"), Path("out/scene_01/1a.mp4")),
+                (Path("2a.mp4"), Path("out/scene_02/2a.mp4")),
+            ],
+            methods={"1a.mp4": "filename:scene_letter", "2a.mp4": "qr"},
+        )
+        buf = io.StringIO()
+        self.reporter.report(plan, stream=buf)
+        output = buf.getvalue()
+
+        assert "Detection methods:" in output
+        assert "1a.mp4: filename:scene_letter" in output
+        assert "2a.mp4: qr" in output
+
+    def test_report_without_methods_omits_section(self):
+        plan = OrganizePlan(
+            mappings=[
+                (Path("1a.mp4"), Path("out/scene_01/1a.mp4")),
+            ],
+        )
+        buf = io.StringIO()
+        self.reporter.report(plan, stream=buf)
+        output = buf.getvalue()
+
+        assert "Detection methods:" not in output
+
     def test_save_to_file(self, tmp_path):
         plan = OrganizePlan(
             mappings=[

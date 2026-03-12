@@ -19,6 +19,7 @@ class OrganizePlan:
     mappings: list[tuple[Path, Path]] = field(default_factory=list)
     unsorted: list[Path] = field(default_factory=list)
     conflicts: list[tuple[Path, Path, Path]] = field(default_factory=list)
+    methods: dict[str, str] = field(default_factory=dict)
 
 
 class Organizer:
@@ -61,6 +62,7 @@ class Organizer:
 
             used_destinations[dest] = source
             result.mappings.append((source, dest))
+            result.methods[source.name] = info.method
 
         return result
 
