@@ -10,7 +10,9 @@
 |-------|------|-------------|-----------|
 | 1 | Filename Organizer | CLI that organizes clips by filename patterns | UC-1001 through UC-1006, UC-4001 through UC-4003 |
 | 2 | QR Code Detection | QR code generation + video QR detection | UC-2001 through UC-2004 |
-| 3 | Clapper Board OCR & Splitting | Visual slate detection, OCR, video splitting | UC-3001 through UC-3004 |
+| 3a | Clapper Board Detection + OCR | Visual slate detection, OCR text extraction | UC-3001, UC-3002 |
+| 3b | Video Splitting | Split continuous video at clapper boundaries | UC-3003 |
+| 3c | Audio Clap Detection | Audio transient detection as supplementary signal | UC-3004 |
 | 4 | Polish & Extensibility | Custom patterns, folder formats, UX improvements | UC-5001, UC-5002 |
 
 Each phase produces a working Docker image that can be used independently. Later phases build on earlier ones without breaking existing functionality.
@@ -153,69 +155,94 @@ UC-2001, UC-2002, UC-2003, UC-2004
 
 ---
 
-## Phase 3: Clapper Board OCR & Video Splitting
+## Phase 3a: Clapper Board Detection + OCR
 
-**Goal:** Detect physical clapper boards in video, read scene/take info via OCR, and split continuous recordings at clapper boundaries.
+**Goal:** Detect physical clapper boards in video frames and read scene/take info via OCR, adding OCR as a detection method in the existing chain: QR → OCR → Filename → Unsorted.
 
 **Prerequisite:** Phase 2 complete.
 
 ### Tasks
 
-#### 3.1 Clapper board visual detection (`clapper_detect.py`)
-- Detect high-contrast rectangular regions in sampled frames
-- Score candidates by aspect ratio, contrast, and stripe pattern
-- Return the best candidate frame and bounding box
-- **Tests:** Detection on frames with and without clapper boards
+#### 3a.1 OCR abstraction layer (`ocr.py`)
+- `OCREngine` protocol with `recognize(image) -> list[OCRResult]`
+- `OCRResult` dataclass: text, confidence, bounding box
+- `TesseractEngine` implementation wrapping pytesseract
+- **Tests:** OCR on synthetic images with drawn text
 
-#### 3.2 OCR integration
-- Preprocess detected slate region (CLAHE, deskew, crop)
-- Run PaddleOCR on preprocessed image
-- Parse OCR output for scene/take patterns ("SCENE 3", "SC 3 TK 2", etc.)
-- Return result with confidence score
-- **Tests:** OCR on preprocessed test images with known text
+#### 3a.2 Clapper board visual detection (`clapper_detect.py`)
+- Detect high-contrast rectangular regions in sampled frames (Canny + contours)
+- Score candidates by aspect ratio, area, and contrast
+- Preprocess best candidate with CLAHE contrast enhancement
+- Parse OCR output for scene/take patterns ("SCENE 3", "SC 3 TK 2", "S3T2", etc.)
+- **Tests:** Slate detection on synthetic frames, OCR text parsing with known patterns
 
-#### 3.3 Audio clap detection (supplementary)
-- Extract audio track using FFmpeg
-- Detect sharp transient peaks using librosa
-- Correlate audio claps with visual detections
-- **Tests:** Clap detection on test audio with known clap positions
+#### 3a.3 Detection chain update
+- Add clapper OCR to detect command chain: QR → OCR → Filename → Unsorted
+- `--mode` flag: `auto` (default), `qr`, `ocr`
+- Add Tesseract system packages to Docker image
+- **Tests:** CLI integration tests with --mode flag, full chain with mixed methods
 
-#### 3.4 Video splitter (`splitter.py`)
+### Phase 3a Acceptance Criteria
+- [x] `OCREngine` protocol with swappable backends (Tesseract implemented)
+- [x] Clapper board regions detected in high-contrast frames
+- [x] OCR text parsed for scene/take patterns (SCENE N, SC N, S3T2, etc.)
+- [x] `--mode auto|qr|ocr` flag on `detect` command
+- [x] Fallback chain (QR → OCR → Filename) works correctly
+- [x] Tesseract added to Docker image (~50MB)
+- [x] All Phase 1 and Phase 2 tests still pass
+
+### Use Cases Covered
+UC-3001, UC-3002
+
+---
+
+## Phase 3b: Video Splitting (Planned)
+
+**Goal:** Split continuous recordings at clapper board boundaries using FFmpeg.
+
+**Prerequisite:** Phase 3a complete.
+
+### Tasks
+
+#### 3b.1 Video splitter (`splitter.py`)
 - Accept a list of split timestamps
 - Use FFmpeg with stream copy to split video
 - Name output clips based on detected scene/take info
 - Handle edge cases (split at very beginning/end, single-scene video)
 - **Tests:** Splitting a test video at known timestamps produces correct segments
 
-#### 3.5 `split` CLI command
+#### 3b.2 `split` CLI command
 - Implement `clipsort split <input-file> <output-dir>`
 - Options: `--mode qr|ocr|auto`, `--scan-seconds`, `--precise`
 - Wire together detection + splitting pipeline
 - **Tests:** End-to-end split test with a multi-scene test video
 
-#### 3.6 Detection chain update
-- Add clapper OCR as a detection method in the chain
-- Updated fallback: QR -> OCR -> filename -> unsorted
-- `--mode` flag to select detection method
-- **Tests:** Full chain with mixed detection methods
+### Use Cases Covered
+UC-3003
 
-#### 3.7 Docker update
-- Add PaddleOCR and its models to the image
+---
+
+## Phase 3c: Audio Clap Detection (Planned)
+
+**Goal:** Detect audible clapper "clap" sounds as a supplementary detection signal.
+
+**Prerequisite:** Phase 3a complete.
+
+### Tasks
+
+#### 3c.1 Audio clap detection
+- Extract audio track using FFmpeg
+- Detect sharp transient peaks using librosa
+- Correlate audio claps with visual detections
+- **Tests:** Clap detection on test audio with known clap positions
+
+#### 3c.2 Docker update
 - Add librosa and audio dependencies
-- Optimize image size (model files are the main contributor)
-- **Tests:** Docker smoke test with OCR detection
-
-### Phase 3 Acceptance Criteria
-- [ ] Clapper board detected in >80% of test videos with visible slates
-- [ ] OCR correctly extracts scene number from legible slates
-- [ ] Audio clap detection finds clap timestamps in test audio
-- [ ] `clipsort split` correctly splits a multi-scene video
-- [ ] Fallback chain (QR -> OCR -> filename) works correctly
-- [ ] Processing time < 30 seconds per video for detection
-- [ ] All Phase 1 and Phase 2 tests still pass
+- Optimize image size
+- **Tests:** Docker smoke test with audio detection
 
 ### Use Cases Covered
-UC-3001, UC-3002, UC-3003, UC-3004
+UC-3004
 
 ---
 

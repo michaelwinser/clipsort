@@ -51,7 +51,7 @@ case "$subcommand" in
                 passthrough+=("$arg")
                 # Flags that consume the next argument as a value
                 case "$arg" in
-                    --report-file|--scan-seconds|--sample-rate) skip_next=true ;;
+                    --report-file|--scan-seconds|--sample-rate|--mode) skip_next=true ;;
                 esac
             else
                 positional_count=$((positional_count + 1))

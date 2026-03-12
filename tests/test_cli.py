@@ -387,3 +387,72 @@ class TestDetectCLI:
         )
         assert result.exit_code != 0
         assert "No video files found" in result.output
+
+    def test_detect_with_mode_qr(self, tmp_path):
+        """--mode qr uses only QR detection + filename fallback."""
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        output_dir = tmp_path / "output"
+
+        (input_dir / "1a.mp4").write_bytes(b"\x00" * 100)
+
+        result = self.runner.invoke(
+            main,
+            ["detect", str(input_dir), str(output_dir), "--mode", "qr", "--dry-run"],
+        )
+        assert result.exit_code == 0
+        assert "scene_01" in result.output
+
+    def test_detect_with_mode_ocr(self, tmp_path):
+        """--mode ocr uses only OCR detection + filename fallback."""
+        pytesseract = pytest.importorskip("pytesseract")  # noqa: F841
+
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        output_dir = tmp_path / "output"
+
+        (input_dir / "2b.mp4").write_bytes(b"\x00" * 100)
+
+        result = self.runner.invoke(
+            main,
+            ["detect", str(input_dir), str(output_dir), "--mode", "ocr", "--dry-run"],
+        )
+        assert result.exit_code == 0
+        # Falls back to filename parsing
+        assert "scene_02" in result.output
+
+    def test_detect_auto_mode_chain(self, make_test_video, tmp_path):
+        """Auto mode tries QR → OCR → filename in order."""
+        pytesseract = pytest.importorskip("pytesseract")  # noqa: F841
+        import json
+        import shutil
+
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        output_dir = tmp_path / "output"
+
+        # QR video
+        data = json.dumps({"v": 1, "scene": 1, "take": 1})
+        video = make_test_video("auto_qr.mp4", qr_data=data)
+        shutil.copy2(video, input_dir / "auto_qr.mp4")
+
+        # Filename-only video
+        (input_dir / "3a.mp4").write_bytes(b"\x00" * 100)
+
+        result = self.runner.invoke(
+            main,
+            [
+                "detect",
+                str(input_dir),
+                str(output_dir),
+                "--mode", "auto",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "2 video file(s)" in result.output
+
+    def test_detect_help_shows_mode_option(self):
+        result = self.runner.invoke(main, ["detect", "--help"])
+        assert result.exit_code == 0
+        assert "--mode" in result.output
+        assert "auto" in result.output

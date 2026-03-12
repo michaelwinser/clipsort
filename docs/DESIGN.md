@@ -172,38 +172,38 @@ class QRGenerator:
 - **Pillow** for image composition
 - **reportlab** or **fpdf2** for PDF generation
 
-### 2.6 Clapper Board Detector (Phase 3)
+### 2.6 Clapper Board Detector (Phase 3a)
 
-Detects the visual presence of a clapper board and extracts text via OCR.
+Detects the visual presence of a clapper board and extracts text via OCR. Uses an `OCREngine` protocol abstraction so the OCR backend can be swapped without changing detection logic.
 
 ```python
+class OCREngine(Protocol):
+    def recognize(self, image: np.ndarray) -> list[OCRResult]: ...
+
+class TesseractEngine:
+    """OCR backend using pytesseract + Tesseract."""
+    def recognize(self, image: np.ndarray) -> list[OCRResult]: ...
+
 class ClapperDetector:
-    def detect(self, video_path: Path) -> ClipInfo | None:
-        """Detect clapper board and read scene/take via OCR."""
-
-    def _find_slate_frame(self, video_path: Path) -> np.ndarray | None:
-        """Find the frame most likely to contain a readable slate."""
-
-    def _preprocess_slate(self, frame: np.ndarray) -> np.ndarray:
-        """Enhance contrast, deskew, crop to slate region."""
-
-    def _ocr_slate(self, slate_image: np.ndarray) -> ClipInfo | None:
-        """Run OCR and extract scene/take fields."""
+    def __init__(self, ocr_engine: OCREngine, scan_seconds=10, sample_rate=2): ...
+    def detect(self, video_path: Path) -> ClipInfo | None: ...
+    def _find_slate_region(self, frame: np.ndarray) -> np.ndarray | None: ...
+    def _preprocess_slate(self, region: np.ndarray) -> np.ndarray: ...
+    def _parse_ocr_results(self, results: list[OCRResult]) -> ClipInfo | None: ...
 ```
 
 **Slate Detection Strategy:**
-1. Sample frames from the first 10 seconds
-2. For each frame, detect high-contrast rectangular regions (potential slates)
-3. Score candidates by: aspect ratio close to 4:3, high internal contrast, presence of horizontal stripes at top
-4. Select the highest-scoring frame
+1. Sample frames from the first N seconds (same pattern as QRDetector)
+2. For each frame: convert to grayscale, apply Canny edge detection, find contours
+3. Score rectangular contours by: area (must be significant portion of frame), aspect ratio (roughly 4:3 to 2:1), internal contrast
+4. Crop the best candidate region
 
 **OCR Pipeline:**
 1. Crop to detected slate region
 2. Apply CLAHE contrast enhancement
-3. Deskew using Hough line detection
-4. Run OCR (PaddleOCR for accuracy; EasyOCR as fallback)
-5. Parse OCR output for patterns like "SCENE: 3" or "SC 3 TK 2"
-6. Return result with confidence score
+3. Run OCR via the `OCREngine` abstraction (Tesseract initially; PaddleOCR can be swapped in later)
+4. Parse OCR output for patterns like "SCENE: 3", "SC 3 TK 2", "S3T2"
+5. Return result with confidence score
 
 ### 2.7 Video Splitter (Phase 3)
 
@@ -305,7 +305,7 @@ clipsort/
 | QR Detection | pyzbar | Fast, reliable, ~10ms per frame |
 | QR Generation | qrcode + Pillow | Lightweight, well-maintained |
 | PDF Generation | fpdf2 | Lightweight, no system dependencies |
-| OCR | PaddleOCR | Best accuracy/size ratio for Docker |
+| OCR | Tesseract (via pytesseract) | Lightweight (~50MB apt package), behind OCREngine abstraction; PaddleOCR can be swapped in later |
 | Video Splitting | FFmpeg (subprocess) | Industry standard, stream copy support |
 | Audio Analysis | librosa | Feature extraction for clap detection |
 | Testing | pytest | Standard Python test framework |

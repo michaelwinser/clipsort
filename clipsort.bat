@@ -49,6 +49,7 @@ for %%a in (%*) do (
             if "%%a"=="--report-file" set SKIP_NEXT=1
             if "%%a"=="--scan-seconds" set SKIP_NEXT=1
             if "%%a"=="--sample-rate" set SKIP_NEXT=1
+            if "%%a"=="--mode" set SKIP_NEXT=1
         ) else (
             set /a POSITIONAL_COUNT+=1
             if !POSITIONAL_COUNT!==1 (

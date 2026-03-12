@@ -93,6 +93,7 @@ def make_test_video(tmp_path_factory):
         fps: int = 5,
         seconds: int = 1,
         qr_data: str | None = None,
+        text_overlay: dict | None = None,
     ) -> Path:
         path = video_dir / filename
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
@@ -116,6 +117,47 @@ def make_test_video(tmp_path_factory):
                 except ImportError:
                     pass
 
+            if text_overlay and i < fps * 2:
+                # Draw clapper-board-like text on first 2 seconds of frames.
+                # Draw a white rectangle as slate background, then black text.
+                slate_x, slate_y = 20, 20
+                slate_w, slate_h = width - 40, height - 40
+                cv2.rectangle(
+                    frame,
+                    (slate_x, slate_y),
+                    (slate_x + slate_w, slate_y + slate_h),
+                    (255, 255, 255),
+                    -1,
+                )
+                # Draw border
+                cv2.rectangle(
+                    frame,
+                    (slate_x, slate_y),
+                    (slate_x + slate_w, slate_y + slate_h),
+                    (0, 0, 0),
+                    2,
+                )
+                scene_num = text_overlay.get("scene", 1)
+                take_num = text_overlay.get("take", 1)
+                cv2.putText(
+                    frame,
+                    f"SCENE {scene_num}",
+                    (slate_x + 10, slate_y + 60),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1.0,
+                    (0, 0, 0),
+                    2,
+                )
+                cv2.putText(
+                    frame,
+                    f"TAKE {take_num}",
+                    (slate_x + 10, slate_y + 120),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1.0,
+                    (0, 0, 0),
+                    2,
+                )
+
             writer.write(frame)
 
         writer.release()
@@ -137,3 +179,15 @@ def qr_video(make_test_video):
 def plain_video(make_test_video):
     """A tiny video with no QR code."""
     return make_test_video("plain_test.mp4")
+
+
+@pytest.fixture(scope="session")
+def clapper_video(make_test_video):
+    """A tiny video with clapper board text overlay (Scene 3, Take 2)."""
+    return make_test_video(
+        "clapper_test.mp4",
+        width=640,
+        height=480,
+        seconds=2,
+        text_overlay={"scene": 3, "take": 2},
+    )

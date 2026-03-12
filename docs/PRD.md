@@ -234,7 +234,7 @@ ClipSort is a command-line tool, packaged as a Docker container, that helps stud
 
 ### UC-3000: Visual Clapper Board Detection and OCR
 
-#### UC-3001: Detect clapper board presence in video frames
+#### UC-3001: Detect clapper board presence in video frames *(Phase 3a — Implemented)*
 
 **Actor:** Student Filmmaker
 **Precondition:** Videos begin with a visible clapper board (standard black-and-white slate)
@@ -250,7 +250,7 @@ ClipSort is a command-line tool, packaged as a Docker container, that helps stud
 - Detection works on standard black-and-white clapper boards
 - Processing time is under 30 seconds per video
 
-#### UC-3002: Read scene/take info from clapper board via OCR
+#### UC-3002: Read scene/take info from clapper board via OCR *(Phase 3a — Implemented)*
 
 **Actor:** Student Filmmaker
 **Precondition:** Clapper board has been detected in a frame
@@ -267,7 +267,7 @@ ClipSort is a command-line tool, packaged as a Docker container, that helps stud
 - Confidence score is reported for each OCR result
 - Low-confidence results trigger a warning and fallback
 
-#### UC-3003: Split a continuous video file at clapper board boundaries
+#### UC-3003: Split a continuous video file at clapper board boundaries *(Phase 3b — Planned)*
 
 **Actor:** Student Filmmaker
 **Precondition:** A single long video file contains multiple scenes separated by clapper boards
@@ -286,7 +286,7 @@ ClipSort is a command-line tool, packaged as a Docker container, that helps stud
 - Each output clip has a meaningful filename
 - Original file is not modified
 
-#### UC-3004: Audio-based clap detection as supplementary signal
+#### UC-3004: Audio-based clap detection as supplementary signal *(Phase 3c — Planned)*
 
 **Actor:** Student Filmmaker
 **Precondition:** Clapper board produces an audible "clap" sound

@@ -142,6 +142,12 @@ def qr_generate(
 @click.option("--report-file", type=click.Path(), default=None, help="Save report to file.")
 @click.option("--scan-seconds", type=int, default=10, help="Seconds to scan for QR codes.")
 @click.option("--sample-rate", type=int, default=2, help="Frames per second to sample.")
+@click.option(
+    "--mode",
+    type=click.Choice(["auto", "qr", "ocr"]),
+    default="auto",
+    help="Detection mode: auto (QR→OCR→filename), qr, or ocr.",
+)
 def detect(
     input_dir: str,
     output_dir: str,
@@ -152,11 +158,12 @@ def detect(
     report_file: str | None,
     scan_seconds: int,
     sample_rate: int,
+    mode: str,
 ) -> None:
-    """Detect scene info via QR codes (with filename fallback).
+    """Detect scene info via QR codes and/or OCR (with filename fallback).
 
-    Scans video files in INPUT_DIR for QR codes. Falls back to filename
-    parsing for files without QR codes. Organizes into OUTPUT_DIR.
+    Scans video files in INPUT_DIR for scene information using the selected
+    detection mode. Falls back to filename parsing. Organizes into OUTPUT_DIR.
     """
     if verbose:
         logging.basicConfig(level=logging.DEBUG, format="%(name)s: %(message)s")
@@ -168,13 +175,28 @@ def detect(
     reporter = Reporter()
     parser = FilenameParser()
 
-    # Build detection chain: QR first, then filename fallback
-    qr_detector = QRDetector(scan_seconds=scan_seconds, sample_rate=sample_rate)
-
     def filename_fallback(path: Path) -> ClipInfo | None:
         return parser.parse(path.name)
 
-    chain = DetectionChain([qr_detector.detect, filename_fallback])
+    # Build detection chain based on mode
+    detectors = []
+
+    if mode in ("auto", "qr"):
+        qr_detector = QRDetector(scan_seconds=scan_seconds, sample_rate=sample_rate)
+        detectors.append(qr_detector.detect)
+
+    if mode in ("auto", "ocr"):
+        from clipsort.clapper_detect import ClapperDetector
+        from clipsort.ocr import TesseractEngine
+
+        ocr_engine = TesseractEngine()
+        clapper_detector = ClapperDetector(
+            ocr_engine=ocr_engine, scan_seconds=scan_seconds, sample_rate=sample_rate
+        )
+        detectors.append(clapper_detector.detect)
+
+    detectors.append(filename_fallback)
+    chain = DetectionChain(detectors)
 
     # Scan
     files = scanner.scan(Path(input_dir), recursive=recursive)
